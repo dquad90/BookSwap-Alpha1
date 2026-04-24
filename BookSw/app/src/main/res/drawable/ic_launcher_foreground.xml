@@ -1,0 +1,33 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <!-- Centering and scaling the logo to fit the foreground layer -->
+    <group
+        android:translateX="12"
+        android:translateY="12"
+        android:scaleX="0.8"
+        android:scaleY="0.8">
+        <!-- Top Book -->
+        <path
+            android:fillColor="#EF827D"
+            android:pathData="M20,20 h80 a5,5 0 0 1 5,5 v15 a5,5 0 0 1 -5,5 h-80 a5,5 0 0 1 -5,-5 v-15 a5,5 0 0 1 5,-5 z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M55,20 h10 v12 l-5,-3 l-5,3 z" />
+
+        <!-- Middle Book -->
+        <path
+            android:fillColor="#70CEF5"
+            android:pathData="M20,48 h80 a5,5 0 0 1 5,5 v15 a5,5 0 0 1 -5,5 h-80 a5,5 0 0 1 -5,-5 v-15 a5,5 0 0 1 5,-5 z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M55,48 h10 v12 l-5,-3 l-5,3 z" />
+
+        <!-- Bottom Book -->
+        <path
+            android:fillColor="#95DFFB"
+            android:pathData="M20,76 h80 a5,5 0 0 1 5,5 v15 a5,5 0 0 1 -5,5 h-80 a5,5 0 0 1 -5,-5 v-15 a5,5 0 0 1 5,-5 z" />
+    </group>
+</vector>
