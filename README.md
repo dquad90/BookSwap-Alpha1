@@ -1,6 +1,6 @@
 <div align="center">
 
-# Jonathan Chambers
+# Darunnaim Sindid
 ### — dquad90
 
 ` Product Designer @Google ` 
