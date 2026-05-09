@@ -141,13 +141,17 @@ class MainActivity : ComponentActivity() {
                                 (it.senderId == currentUser?.id || it.receiverId == currentUser?.id) && it.status == "accepted" 
                             }
                             val myFavoritesCount = 0 
+                            val myWishlistCount = 0
+                            val myRatingCount = 0
                             
                             ProfileScreen(
-                                 userName = userName,
+                                userName = userName,
                                 profile = currentProfile,
                                 booksCount = myBooksCount,
                                 swapsCount = mySwapsCount,
                                 favoritesCount = myFavoritesCount,
+                                wishlistCount = myWishlistCount,
+                                ratingCount = myRatingCount,
                                 onBack = { currentScreen = "home" },
                                 onLogout = {
                                     authViewModel.logout()

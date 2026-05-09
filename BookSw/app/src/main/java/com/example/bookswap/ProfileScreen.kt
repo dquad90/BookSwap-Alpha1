@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -34,6 +35,8 @@ fun ProfileScreen(
     booksCount: Int,
     swapsCount: Int,
     favoritesCount: Int,
+    wishlistCount: Int,
+    ratingCount: Int,
     onBack: () -> Unit,
     onLogout: () -> Unit,
     onAddBookClick: () -> Unit
@@ -41,6 +44,8 @@ fun ProfileScreen(
     val scrollState = rememberScrollState()
     val windowSize = rememberWindowSize()
     var showPersonalInfo by remember { mutableStateOf(false) }
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val tabs = listOf("Swaps", "Favorites", "Wishlist", "Ratings")
 
     Column(
         modifier = Modifier
@@ -58,7 +63,7 @@ fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .systemBarsPadding() // Boundary adjustment inside header
+                    .systemBarsPadding()
                     .padding(bottom = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
@@ -109,38 +114,68 @@ fun ProfileScreen(
             }
         }
 
-        // Stats Panel
+        // Stats Panel (Scrollable to accommodate all 5 metrics)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            StatCard(
-                modifier = Modifier.weight(1f),
-                count = swapsCount.toString(),
-                label = "Swaps",
-                icon = Icons.Default.SwapHoriz,
-                color = Color(0xFFE3F2FD),
-                contentColor = Color(0xFF1976D2)
-            )
-            StatCard(
-                modifier = Modifier.weight(1f),
-                count = booksCount.toString(),
-                label = "Books",
-                icon = Icons.Default.MenuBook,
-                color = Color(0xFFE8F5E9),
-                contentColor = Color(0xFF2E7D32)
-            )
-            StatCard(
-                modifier = Modifier.weight(1f),
-                count = favoritesCount.toString(),
-                label = "Favorites",
-                icon = Icons.Default.Favorite,
-                color = Color(0xFFFFEBEE),
-                contentColor = Color(0xFFD32F2F)
-            )
+            StatCard(count = swapsCount.toString(), label = "Swaps", icon = Icons.Default.SwapHoriz, color = Color(0xFFE3F2FD), contentColor = Color(0xFF1976D2))
+            StatCard(count = booksCount.toString(), label = "Books", icon = Icons.Default.MenuBook, color = Color(0xFFE8F5E9), contentColor = Color(0xFF2E7D32))
+            StatCard(count = favoritesCount.toString(), label = "Favorite", icon = Icons.Default.Favorite, color = Color(0xFFFFEBEE), contentColor = Color(0xFFD32F2F))
+            StatCard(count = wishlistCount.toString(), label = "Wishlist", icon = Icons.Default.Bookmark, color = Color(0xFFF3E5F5), contentColor = Color(0xFF7B1FA2))
+            StatCard(count = ratingCount.toString(), label = "Ratings", icon = Icons.Default.Star, color = Color(0xFFFFF3E0), contentColor = Color(0xFFE65100))
         }
+
+        // Tab Selection
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.White,
+            shadowElevation = 1.dp
+        ) {
+            ScrollableTabRow(
+                selectedTabIndex = selectedTabIndex,
+                containerColor = Color.White,
+                contentColor = Color(0xFF1976D2),
+                edgePadding = 24.dp,
+                divider = {}
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTabIndex == index,
+                        onClick = { selectedTabIndex = index },
+                        text = {
+                            Text(
+                                text = title,
+                                fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 14.sp
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Tab Content Area
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .heightIn(min = 120.dp)
+        ) {
+            when (selectedTabIndex) {
+                0 -> Text("Your recent swaps will appear here.", color = Color.Gray, fontSize = 14.sp)
+                1 -> Text("Books you have marked as favorites.", color = Color.Gray, fontSize = 14.sp)
+                2 -> Text("Books you want to read.", color = Color.Gray, fontSize = 14.sp)
+                3 -> Text("Reviews you have received or given.", color = Color.Gray, fontSize = 14.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
 
         // Menu Section
         Column(
@@ -157,7 +192,6 @@ fun ProfileScreen(
                 modifier = Modifier.padding(bottom = 4.dp)
             )
 
-            // Personal Information Item
             ProfileActionItem(
                 icon = Icons.Default.Badge,
                 title = "Personal Information",
@@ -247,7 +281,7 @@ fun StatCard(
     contentColor: Color
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.width(105.dp),
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp
@@ -319,10 +353,12 @@ fun ProfileActionItem(
 fun ProfileScreenPreview() {
     ProfileScreen(
         userName = "John Doe",
-        profile = Profile(fullName = "John Doe", email = "john@example.com", phone = "+1 234 567 890", address = "123 Book St, Library City"),
+        profile = null,
         booksCount = 5,
         swapsCount = 12,
         favoritesCount = 8,
+        wishlistCount = 3,
+        ratingCount = 4,
         onBack = {},
         onLogout = {},
         onAddBookClick = {}
