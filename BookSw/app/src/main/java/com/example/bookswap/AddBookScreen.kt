@@ -52,6 +52,23 @@ fun AddBookScreen(
     val error by viewModel.error
     val scrollState = rememberScrollState()
 
+    // Show Dialog when there is an error
+    if (error != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            icon = { Icon(Icons.Default.Error, contentDescription = null, tint = Color.Red) },
+            title = { Text("Publishing Issue", fontWeight = FontWeight.Bold) },
+            text = { Text(error ?: "An unexpected error occurred while adding the book.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearError() }) {
+                    Text("Try Again", color = CyanMain, fontWeight = FontWeight.Bold)
+                }
+            },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White
+        )
+    }
+
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -86,10 +103,6 @@ fun AddBookScreen(
                 .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (error != null) {
-                Text(text = error!!, color = Color.Red, modifier = Modifier.padding(bottom = 8.dp))
-            }
-
             // Image Upload Area
             Box(
                 modifier = Modifier

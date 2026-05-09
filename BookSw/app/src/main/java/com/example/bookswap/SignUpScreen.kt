@@ -43,6 +43,23 @@ fun SignUpScreen(
     val scrollState = rememberScrollState()
     val windowSize = rememberWindowSize()
 
+    // Show Dialog when there is a sign-up error
+    if (error != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            icon = { Icon(Icons.Default.Error, contentDescription = null, tint = Color.Red) },
+            title = { Text("Registration Issue", fontWeight = FontWeight.Bold) },
+            text = { Text(error ?: "An unexpected error occurred during sign up.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearError() }) {
+                    Text("Try Again", color = CyanMain, fontWeight = FontWeight.Bold)
+                }
+            },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White
+        )
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
         HeaderBackground()
 
@@ -50,14 +67,13 @@ fun SignUpScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .systemBarsPadding()
-                .imePadding() // Ensures layout moves up when keyboard appears
+                .imePadding()
                 .padding(horizontal = if (windowSize.widthSizeClass == WindowSizeClass.EXPANDED) 120.dp else 32.dp)
                 .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(if (windowSize.heightSizeClass == WindowSizeClass.COMPACT) 20.dp else 40.dp))
             
-            // Top Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -92,10 +108,6 @@ fun SignUpScreen(
             )
 
             Spacer(modifier = Modifier.height(20.dp))
-
-            if (error != null) {
-                Text(text = error!!, color = Color.Red, modifier = Modifier.padding(bottom = 8.dp))
-            }
 
             TextField(
                 value = name,

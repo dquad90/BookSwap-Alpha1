@@ -24,6 +24,15 @@ data class Book(
     val category: String = "Fiction"
 )
 
+@Serializable
+data class Favorite(
+    val id: Long? = null,
+    @SerialName("user_id")
+    val userId: String,
+    @SerialName("book_id")
+    val bookId: Long
+)
+
 val sampleBooks = listOf(
     Book(
         id = 1,

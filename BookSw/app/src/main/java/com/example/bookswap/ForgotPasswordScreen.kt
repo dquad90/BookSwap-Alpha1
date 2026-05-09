@@ -8,6 +8,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +33,23 @@ fun ForgotPasswordScreen(
     val error by viewModel.error
     val scrollState = rememberScrollState()
     val windowSize = rememberWindowSize()
+
+    // Show Dialog when there is an error
+    if (error != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            icon = { Icon(Icons.Default.Error, contentDescription = null, tint = Color.Red) },
+            title = { Text("Reset Issue", fontWeight = FontWeight.Bold) },
+            text = { Text(error ?: "An unexpected error occurred.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearError() }) {
+                    Text("Try Again", color = CyanMain, fontWeight = FontWeight.Bold)
+                }
+            },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White
+        )
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
         HeaderBackground()
@@ -91,10 +109,6 @@ fun ForgotPasswordScreen(
                     color = Color.Gray,
                     modifier = Modifier.padding(bottom = 24.dp)
                 )
-
-                if (error != null) {
-                    Text(text = error!!, color = Color.Red, modifier = Modifier.padding(bottom = 8.dp))
-                }
 
                 TextField(
                     value = email,

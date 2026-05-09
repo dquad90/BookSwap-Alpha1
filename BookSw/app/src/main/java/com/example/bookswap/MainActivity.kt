@@ -86,7 +86,7 @@ class MainActivity : ComponentActivity() {
                         "home" -> HomeScreen(
                             userName = userName,
                             userPhotoUrl = userPhotoUrl,
-                            books = bookViewModel.books,
+                            viewModel = bookViewModel,
                             onBookClick = { book ->
                                 selectedBook = book
                                 currentScreen = "details"
@@ -136,22 +136,27 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         "profile" -> {
-                            val myBooksCount = bookViewModel.books.count { it.ownerId == currentUser?.id }
+                            val myBooks = bookViewModel.books.filter { it.ownerId == currentUser?.id }
+                            val favoriteBooks = bookViewModel.books.filter { it.id in bookViewModel.favorites }
+                            
                             val mySwapsCount = chatViewModel.chatRequests.count { 
                                 (it.senderId == currentUser?.id || it.receiverId == currentUser?.id) && it.status == "accepted" 
                             }
-                            val myFavoritesCount = 0 
-                            val myWishlistCount = 0
-                            val myRatingCount = 0
                             
                             ProfileScreen(
                                 userName = userName,
                                 profile = currentProfile,
-                                booksCount = myBooksCount,
+                                booksCount = myBooks.size,
                                 swapsCount = mySwapsCount,
-                                favoritesCount = myFavoritesCount,
-                                wishlistCount = myWishlistCount,
-                                ratingCount = myRatingCount,
+                                favoritesCount = favoriteBooks.size,
+                                wishlistCount = 0,
+                                ratingCount = 0,
+                                myBooks = myBooks,
+                                favoriteBooks = favoriteBooks,
+                                onBookClick = { book ->
+                                    selectedBook = book
+                                    currentScreen = "details"
+                                },
                                 onBack = { currentScreen = "home" },
                                 onLogout = {
                                     authViewModel.logout()

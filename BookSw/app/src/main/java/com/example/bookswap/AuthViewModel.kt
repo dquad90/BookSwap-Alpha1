@@ -75,7 +75,7 @@ class AuthViewModel : ViewModel() {
                     if (data.isNotEmpty()) {
                         data[0].email
                     } else {
-                        throw Exception("User not found with this name")
+                        throw Exception("User not found")
                     }
                 }
 
@@ -87,7 +87,14 @@ class AuthViewModel : ViewModel() {
                 fetchProfile()
                 onSuccess()
             } catch (e: Exception) {
-                _error.value = e.message ?: "Login failed"
+                val message = e.message ?: ""
+                _error.value = when {
+                    message.contains("Invalid login credentials", ignoreCase = true) -> 
+                        "Incorrect email or password. Please try again."
+                    message.contains("User not found", ignoreCase = true) -> 
+                        "No account found with this name or email."
+                    else -> "Login failed. Please check your connection."
+                }
             } finally {
                 _loading.value = false
             }
@@ -121,7 +128,12 @@ class AuthViewModel : ViewModel() {
                 }
                 onSuccess()
             } catch (e: Exception) {
-                _error.value = e.message ?: "Sign up failed"
+                val message = e.message ?: ""
+                _error.value = when {
+                    message.contains("User already registered", ignoreCase = true) -> 
+                        "An account with this email already exists."
+                    else -> message.ifBlank { "Sign up failed" }
+                }
             } finally {
                 _loading.value = false
             }
@@ -147,7 +159,7 @@ class AuthViewModel : ViewModel() {
                 _profile.value = null
                 onSuccess()
             } catch (e: Exception) {
-                _error.value = e.message ?: "Verification failed"
+                _error.value = "Invalid or expired verification code."
             } finally {
                 _loading.value = false
             }
@@ -166,7 +178,7 @@ class AuthViewModel : ViewModel() {
                 auth.resetPasswordForEmail(email)
                 onSuccess()
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to send reset link"
+                _error.value = "Failed to send reset link. Check your email address."
             } finally {
                 _loading.value = false
             }

@@ -29,6 +29,9 @@ class BookViewModel : ViewModel() {
     private val _books = mutableStateListOf<Book>()
     val books: List<Book> = _books
 
+    private val _favorites = mutableStateListOf<Long>()
+    val favorites: List<Long> = _favorites
+
     fun fetchBooks() {
         _loading.value = true
         viewModelScope.launch {
@@ -40,10 +43,59 @@ class BookViewModel : ViewModel() {
                     .decodeList<Book>()
                 _books.clear()
                 _books.addAll(results)
+                
+                // Also fetch favorites if user is logged in
+                fetchFavorites()
             } catch (e: Exception) {
                 _error.value = "Failed to fetch books: ${e.message}"
             } finally {
                 _loading.value = false
+            }
+        }
+    }
+
+    fun fetchFavorites() {
+        val user = auth.currentUserOrNull() ?: return
+        viewModelScope.launch {
+            try {
+                val results = postgrest["favorites"]
+                    .select {
+                        filter {
+                            eq("user_id", user.id)
+                        }
+                    }
+                    .decodeList<Favorite>()
+                _favorites.clear()
+                _favorites.addAll(results.map { it.bookId })
+            } catch (e: Exception) {
+                // Silently fail or log for favorites
+                println("Failed to fetch favorites: ${e.message}")
+            }
+        }
+    }
+
+    fun toggleFavorite(bookId: Long) {
+        val user = auth.currentUserOrNull() ?: return
+        
+        viewModelScope.launch {
+            try {
+                if (_favorites.contains(bookId)) {
+                    // Remove from favorites
+                    postgrest["favorites"].delete {
+                        filter {
+                            eq("user_id", user.id)
+                            eq("book_id", bookId)
+                        }
+                    }
+                    _favorites.remove(bookId)
+                } else {
+                    // Add to favorites
+                    val fav = Favorite(userId = user.id, bookId = bookId)
+                    postgrest["favorites"].insert(fav)
+                    _favorites.add(bookId)
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to update favorite: ${e.message}"
             }
         }
     }

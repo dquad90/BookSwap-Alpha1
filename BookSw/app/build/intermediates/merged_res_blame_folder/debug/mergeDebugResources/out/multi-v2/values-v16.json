@@ -4,7 +4,7 @@
             "outputFile": "com.example.bookswap.app-mergeDebugResources-46:/values-v16/values-v16.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\User\\.gradle\\caches\\9.0.0\\transforms\\52c683d7560524edb2a27d60f753370c\\transformed\\core-1.12.0\\res\\values-v16\\values-v16.xml",
+                    "source": "C:\\Users\\User\\.gradle\\caches\\9.3.1\\transforms\\bf8697754d4af57985ee98bbfef0bbd5\\workspace\\transformed\\core-1.12.0\\res\\values-v16\\values-v16.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",

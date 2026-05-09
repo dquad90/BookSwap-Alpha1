@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,12 +33,15 @@ fun HomeScreen(
     onChatClick: () -> Unit,
     onProfileClick: () -> Unit,
     onLogout: () -> Unit,
-    books: List<Book> = sampleBooks
+    viewModel: BookViewModel // Pass the ViewModel to access favorites
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val categories = listOf("All", "Fiction", "Science", "Business", "History", "Arts")
     var selectedCategory by remember { mutableStateOf("All") }
     val windowSize = rememberWindowSize()
+    
+    val books = viewModel.books
+    val favoriteBookIds = viewModel.favorites
 
     Scaffold(
         bottomBar = {
@@ -78,10 +82,14 @@ fun HomeScreen(
             }
         }
     ) { paddingValues ->
-        val filteredBooks = if (selectedCategory == "All") {
-            books
-        } else {
-            books.filter { it.category == selectedCategory }
+        val filteredBooks = books.filter { book ->
+            val matchesCategory = selectedCategory == "All" || book.category == selectedCategory
+            val matchesSearch = searchQuery.isBlank() || 
+                book.title.contains(searchQuery, ignoreCase = true) || 
+                book.description.contains(searchQuery, ignoreCase = true) ||
+                book.owner.contains(searchQuery, ignoreCase = true)
+            
+            matchesCategory && matchesSearch
         }
 
         Column(
@@ -137,8 +145,14 @@ fun HomeScreen(
                 placeholder = { Text("Search for books, authors...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
-                    IconButton(onClick = { }) {
-                        Icon(Icons.Default.FilterList, contentDescription = null)
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear search")
+                        }
+                    } else {
+                        IconButton(onClick = { }) {
+                            Icon(Icons.Default.FilterList, contentDescription = null)
+                        }
                     }
                 },
                 shape = RoundedCornerShape(16.dp),
@@ -176,8 +190,9 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // Featured Books
+            val titleText = if (searchQuery.isEmpty()) "Featured Books" else "Search Results"
             Text(
-                text = "Featured Books",
+                text = titleText,
                 fontSize = if (windowSize.widthSizeClass == WindowSizeClass.COMPACT) 20.sp else 28.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = if (windowSize.widthSizeClass == WindowSizeClass.EXPANDED) 120.dp else 24.dp)
@@ -185,46 +200,62 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = if (windowSize.widthSizeClass == WindowSizeClass.EXPANDED) 120.dp else 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                items(filteredBooks) { book ->
-                    BookCard(
-                        book = book,
-                        onClick = { onBookClick(book) },
-                        backgroundColor = if (book.id == 1L) Color(0xFFFFE5E5) else Color(0xFFFFF3E0),
-                        windowSize = windowSize
-                    )
+            if (filteredBooks.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No books found matching your criteria", color = Color.Gray)
+                }
+            } else {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = if (windowSize.widthSizeClass == WindowSizeClass.EXPANDED) 120.dp else 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    items(filteredBooks) { book ->
+                        BookCard(
+                            book = book,
+                            isFavorite = favoriteBookIds.contains(book.id),
+                            onFavoriteToggle = {
+                                book.id?.let { viewModel.toggleFavorite(it) }
+                            },
+                            onClick = { onBookClick(book) },
+                            backgroundColor = if (book.id == 1L) Color(0xFFFFE5E5) else Color(0xFFFFF3E0),
+                            windowSize = windowSize
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Near You Section
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = if (windowSize.widthSizeClass == WindowSizeClass.EXPANDED) 120.dp else 24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Recently Added",
-                    fontSize = if (windowSize.widthSizeClass == WindowSizeClass.COMPACT) 20.sp else 28.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                TextButton(onClick = { }) {
-                    Text("See All", color = Color(0xFF1976D2))
+            if (searchQuery.isEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = if (windowSize.widthSizeClass == WindowSizeClass.EXPANDED) 120.dp else 24.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Recently Added",
+                        fontSize = if (windowSize.widthSizeClass == WindowSizeClass.COMPACT) 20.sp else 28.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    TextButton(onClick = { }) {
+                        Text("See All", color = Color(0xFF1976D2))
+                    }
                 }
-            }
 
-            Column(
-                modifier = Modifier.padding(horizontal = if (windowSize.widthSizeClass == WindowSizeClass.EXPANDED) 120.dp else 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                filteredBooks.takeLast(2).forEach { book ->
-                    RecentBookRow(book = book, onClick = { onBookClick(book) })
+                Column(
+                    modifier = Modifier.padding(horizontal = if (windowSize.widthSizeClass == WindowSizeClass.EXPANDED) 120.dp else 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    books.takeLast(2).reversed().forEach { book ->
+                        RecentBookRow(book = book, onClick = { onBookClick(book) })
+                    }
                 }
             }
 
@@ -286,7 +317,14 @@ fun RecentBookRow(book: Book, onClick: () -> Unit) {
 }
 
 @Composable
-fun BookCard(book: Book, onClick: () -> Unit, backgroundColor: Color, windowSize: WindowSize = WindowSize(WindowSizeClass.COMPACT, WindowSizeClass.MEDIUM, 360.dp, 800.dp)) {
+fun BookCard(
+    book: Book, 
+    isFavorite: Boolean = false,
+    onFavoriteToggle: () -> Unit = {},
+    onClick: () -> Unit, 
+    backgroundColor: Color, 
+    windowSize: WindowSize = WindowSize(WindowSizeClass.COMPACT, WindowSizeClass.MEDIUM, 360.dp, 800.dp)
+) {
     Card(
         modifier = Modifier
             .width(if (windowSize.widthSizeClass == WindowSizeClass.COMPACT) 220.dp else 300.dp)
@@ -319,14 +357,15 @@ fun BookCard(book: Book, onClick: () -> Unit, backgroundColor: Color, windowSize
                 modifier = Modifier
                     .padding(16.dp)
                     .size(if (windowSize.widthSizeClass == WindowSizeClass.COMPACT) 36.dp else 48.dp)
-                    .align(Alignment.TopEnd),
+                    .align(Alignment.TopEnd)
+                    .clickable { onFavoriteToggle() },
                 shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.2f)
+                color = Color.Black.copy(alpha = 0.3f)
             ) {
                 Icon(
-                    Icons.Default.FavoriteBorder,
-                    contentDescription = null,
-                    tint = Color.White,
+                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = "Favorite",
+                    tint = if (isFavorite) Color.Red else Color.White,
                     modifier = Modifier.padding(if (windowSize.widthSizeClass == WindowSizeClass.COMPACT) 8.dp else 12.dp)
                 )
             }
@@ -386,18 +425,4 @@ fun BookCard(book: Book, onClick: () -> Unit, backgroundColor: Color, windowSize
             }
         }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview() {
-    HomeScreen(
-        userName = "Reader",
-        userPhotoUrl = null,
-        onBookClick = {},
-        onAddClick = {},
-        onChatClick = {},
-        onProfileClick = {},
-        onLogout = {}
-    )
 }

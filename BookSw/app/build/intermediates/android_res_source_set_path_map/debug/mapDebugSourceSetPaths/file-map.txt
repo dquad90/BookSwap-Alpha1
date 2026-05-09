@@ -1,0 +1,7 @@
+com.example.bookswap.app-resValues-0 D:\AndroidStudioProjects\BookSw\app\build\generated\res\resValues\debug
+com.example.bookswap.app-updated_navigation_xml-1 D:\AndroidStudioProjects\BookSw\app\build\generated\updated_navigation_xml\debug
+com.example.bookswap.app-packageDebugResources-2 D:\AndroidStudioProjects\BookSw\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+com.example.bookswap.app-packageDebugResources-3 D:\AndroidStudioProjects\BookSw\app\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+com.example.bookswap.app-debug-4 D:\AndroidStudioProjects\BookSw\app\build\intermediates\merged_res\debug\mergeDebugResources
+com.example.bookswap.app-debug-5 D:\AndroidStudioProjects\BookSw\app\src\debug\res
+com.example.bookswap.app-main-6 D:\AndroidStudioProjects\BookSw\app\src\main\res
