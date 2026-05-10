@@ -21,7 +21,9 @@ data class Book(
     val rentalPricePerDay: Double? = null,
     @SerialName("image_url")
     val imageUrl: String? = null,
-    val category: String = "Fiction"
+    val category: String = "Fiction",
+    @SerialName("created_at")
+    val createdAt: String? = null // Added to track when the book was published
 )
 
 @Serializable
@@ -40,7 +42,7 @@ val sampleBooks = listOf(
         owner = "John Doe",
         rating = 4.8,
         swaps = 12,
-        description = "A global phenomenon, The Alchemist has been read and loved by over 62 million readers, becoming one of the best-selling books in history.",
+        description = "A global phenomenon...",
         isAvailable = true,
         isForRent = true,
         rentalPricePerDay = 2.5,
@@ -52,21 +54,9 @@ val sampleBooks = listOf(
         owner = "Jane Smith",
         rating = 4.9,
         swaps = 8,
-        description = "No matter your goals, Atomic Habits offers a proven framework for improving--every day.",
+        description = "No matter your goals...",
         isAvailable = false,
         isForRent = false,
-        category = "Business"
-    ),
-    Book(
-        id = 3,
-        title = "The Psychology of Money",
-        owner = "Alice Johnson",
-        rating = 4.7,
-        swaps = 15,
-        description = "Doing well with money isn’t necessarily about what you know. It’s about how you behave.",
-        isAvailable = true,
-        isForRent = true,
-        rentalPricePerDay = 3.0,
         category = "Business"
     )
 )

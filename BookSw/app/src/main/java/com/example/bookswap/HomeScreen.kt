@@ -33,7 +33,7 @@ fun HomeScreen(
     onChatClick: () -> Unit,
     onProfileClick: () -> Unit,
     onLogout: () -> Unit,
-    viewModel: BookViewModel // Pass the ViewModel to access favorites
+    viewModel: BookViewModel
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val categories = listOf("All", "Fiction", "Science", "Business", "History", "Arts")
@@ -253,7 +253,8 @@ fun HomeScreen(
                     modifier = Modifier.padding(horizontal = if (windowSize.widthSizeClass == WindowSizeClass.EXPANDED) 120.dp else 24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    books.takeLast(2).reversed().forEach { book ->
+                    // Take the first 3 items (since we sort by DESC id, these are the newest)
+                    books.take(3).forEach { book ->
                         RecentBookRow(book = book, onClick = { onBookClick(book) })
                     }
                 }

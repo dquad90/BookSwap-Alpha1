@@ -28,9 +28,19 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var currentScreen by remember { mutableStateOf("splash") }
-                    var selectedBook by remember { mutableStateOf<Book?>(null) }
+                    var selectedBookId by remember { mutableStateOf<Long?>(null) }
                     var selectedChatRequestId by remember { mutableStateOf<Long?>(null) }
                     var tempEmail by remember { mutableStateOf("") }
+
+                    // Logic to handle instant navigation if a book is deleted while viewing it
+                    val bookExists = remember(selectedBookId, bookViewModel.books.size) {
+                        selectedBookId == null || bookViewModel.books.any { it.id == selectedBookId }
+                    }
+                    
+                    if (currentScreen == "details" && !bookExists) {
+                        currentScreen = "home"
+                        selectedBookId = null
+                    }
 
                     LaunchedEffect(key1 = currentScreen) {
                         if (currentScreen == "splash") {
@@ -50,7 +60,6 @@ class MainActivity : ComponentActivity() {
                     val currentProfile = authViewModel.profile.value
                     val userName = currentProfile?.fullName ?: currentUser?.userMetadata?.get("full_name")?.toString()?.replace("\"", "") 
                         ?: currentUser?.email?.substringBefore("@") ?: "User"
-                    val userPhotoUrl = null
 
                     when (currentScreen) {
                         "splash" -> SplashScreen()
@@ -85,15 +94,13 @@ class MainActivity : ComponentActivity() {
                         )
                         "home" -> HomeScreen(
                             userName = userName,
-                            userPhotoUrl = userPhotoUrl,
+                            userPhotoUrl = null,
                             viewModel = bookViewModel,
                             onBookClick = { book ->
-                                selectedBook = book
+                                selectedBookId = book.id
                                 currentScreen = "details"
                             },
-                            onAddClick = {
-                                currentScreen = "add_book"
-                            },
+                            onAddClick = { currentScreen = "add_book" },
                             onChatClick = {
                                 chatViewModel.fetchChatRequests()
                                 currentScreen = "chat_list"
@@ -107,16 +114,33 @@ class MainActivity : ComponentActivity() {
                                 currentScreen = "login"
                             }
                         )
-                        "details" -> selectedBook?.let { book ->
+                        "details" -> selectedBookId?.let { id ->
                             BookDetailsScreen(
-                                book = book,
-                                viewModel = chatViewModel,
-                                onBack = { currentScreen = "home" },
+                                bookId = id,
+                                currentUserId = currentUser?.id ?: "",
+                                chatViewModel = chatViewModel,
+                                bookViewModel = bookViewModel,
+                                onBack = { 
+                                    currentScreen = "home"
+                                    selectedBookId = null 
+                                },
+                                onEditClick = { currentScreen = "edit_book" },
                                 onRequestSent = {
                                     chatViewModel.fetchChatRequests()
                                     currentScreen = "chat_list"
                                 }
                             )
+                        }
+                        "edit_book" -> selectedBookId?.let { id ->
+                            val bookToEdit = bookViewModel.books.find { it.id == id }
+                            bookToEdit?.let {
+                                EditBookScreen(
+                                    book = it,
+                                    viewModel = bookViewModel,
+                                    onBack = { currentScreen = "details" },
+                                    onBookUpdated = { currentScreen = "details" }
+                                )
+                            }
                         }
                         "chat_list" -> ChatListScreen(
                             viewModel = chatViewModel,
@@ -154,7 +178,7 @@ class MainActivity : ComponentActivity() {
                                 myBooks = myBooks,
                                 favoriteBooks = favoriteBooks,
                                 onBookClick = { book ->
-                                    selectedBook = book
+                                    selectedBookId = book.id
                                     currentScreen = "details"
                                 },
                                 onBack = { currentScreen = "home" },

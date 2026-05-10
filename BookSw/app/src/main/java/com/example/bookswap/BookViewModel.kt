@@ -10,7 +10,14 @@ import androidx.lifecycle.viewModelScope
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.decodeRecord
+import io.github.jan.supabase.realtime.postgresChangeFlow
+import io.github.jan.supabase.realtime.realtime
 import io.github.jan.supabase.storage.storage
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.util.UUID
@@ -19,6 +26,7 @@ class BookViewModel : ViewModel() {
     private val postgrest = supabase.postgrest
     private val auth = supabase.auth
     private val storage = supabase.storage
+    private val realtime = supabase.realtime
 
     private val _loading = mutableStateOf(false)
     val loading: State<Boolean> = _loading
@@ -32,6 +40,48 @@ class BookViewModel : ViewModel() {
     private val _favorites = mutableStateListOf<Long>()
     val favorites: List<Long> = _favorites
 
+    init {
+        fetchBooks()
+        subscribeToBooks()
+    }
+
+    private fun subscribeToBooks() {
+        val channel = realtime.channel("books-realtime")
+        
+        channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+            table = "books"
+        }.onEach { action ->
+            when (action) {
+                is PostgresAction.Insert -> {
+                    val newBook = action.decodeRecord<Book>()
+                    if (_books.none { it.id == newBook.id }) {
+                        _books.add(0, newBook)
+                    }
+                }
+                is PostgresAction.Update -> {
+                    val updatedBook = action.decodeRecord<Book>()
+                    val index = _books.indexOfFirst { it.id == updatedBook.id }
+                    if (index != -1) {
+                        _books[index] = updatedBook
+                    }
+                }
+                is PostgresAction.Delete -> {
+                    val deletedId = action.oldRecord["id"]?.toString()?.toLongOrNull()
+                    _books.removeAll { it.id == deletedId }
+                }
+                else -> {}
+            }
+        }.launchIn(viewModelScope)
+
+        viewModelScope.launch {
+            try {
+                channel.subscribe()
+            } catch (e: Exception) {
+                println("Realtime subscription error: ${e.message}")
+            }
+        }
+    }
+
     fun fetchBooks() {
         _loading.value = true
         viewModelScope.launch {
@@ -44,7 +94,6 @@ class BookViewModel : ViewModel() {
                 _books.clear()
                 _books.addAll(results)
                 
-                // Also fetch favorites if user is logged in
                 fetchFavorites()
             } catch (e: Exception) {
                 _error.value = "Failed to fetch books: ${e.message}"
@@ -68,7 +117,6 @@ class BookViewModel : ViewModel() {
                 _favorites.clear()
                 _favorites.addAll(results.map { it.bookId })
             } catch (e: Exception) {
-                // Silently fail or log for favorites
                 println("Failed to fetch favorites: ${e.message}")
             }
         }
@@ -80,7 +128,6 @@ class BookViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 if (_favorites.contains(bookId)) {
-                    // Remove from favorites
                     postgrest["favorites"].delete {
                         filter {
                             eq("user_id", user.id)
@@ -89,13 +136,54 @@ class BookViewModel : ViewModel() {
                     }
                     _favorites.remove(bookId)
                 } else {
-                    // Add to favorites
                     val fav = Favorite(userId = user.id, bookId = bookId)
                     postgrest["favorites"].insert(fav)
                     _favorites.add(bookId)
                 }
             } catch (e: Exception) {
                 _error.value = "Failed to update favorite: ${e.message}"
+            }
+        }
+    }
+
+    fun updateBookAvailability(bookId: Long, isAvailable: Boolean) {
+        // INSTANT LOCAL UPDATE
+        val index = _books.indexOfFirst { it.id == bookId }
+        if (index != -1) {
+            _books[index] = _books[index].copy(isAvailable = isAvailable)
+        }
+
+        viewModelScope.launch {
+            try {
+                postgrest["books"].update({
+                    Book::isAvailable setTo isAvailable
+                }) {
+                    filter {
+                        eq("id", bookId)
+                    }
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to update availability: ${e.message}"
+                fetchBooks() // Revert only on error
+            }
+        }
+    }
+
+    fun deleteBook(bookId: Long, onSuccess: () -> Unit) {
+        // INSTANT LOCAL REMOVAL
+        _books.removeAll { it.id == bookId }
+        onSuccess() // Navigate away INSTANTLY
+
+        viewModelScope.launch {
+            try {
+                postgrest["books"].delete {
+                    filter {
+                        eq("id", bookId)
+                    }
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to delete book: ${e.message}"
+                fetchBooks() // Restore if delete actually failed
             }
         }
     }
@@ -114,11 +202,7 @@ class BookViewModel : ViewModel() {
             return
         }
 
-        val currentUser = auth.currentUserOrNull()
-        if (currentUser == null) {
-            _error.value = "User not logged in"
-            return
-        }
+        val currentUser = auth.currentUserOrNull() ?: return
 
         _loading.value = true
         _error.value = null
@@ -127,7 +211,6 @@ class BookViewModel : ViewModel() {
             try {
                 var finalImageBytes = imageBytes
                 
-                // Ensure image is JPG and doesn't exceed 300KB
                 if (finalImageBytes != null) {
                     var quality = 80
                     var bitmap = BitmapFactory.decodeByteArray(finalImageBytes, 0, finalImageBytes.size)
@@ -136,26 +219,11 @@ class BookViewModel : ViewModel() {
                     bitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
                     finalImageBytes = outputStream.toByteArray()
                     
-                    // Further compress if still over 300KB
                     while (finalImageBytes!!.size > 300 * 1024 && quality > 10) {
                         quality -= 10
                         val loopStream = ByteArrayOutputStream()
                         bitmap.compress(Bitmap.CompressFormat.JPEG, quality, loopStream)
                         finalImageBytes = loopStream.toByteArray()
-                    }
-                    
-                    if (finalImageBytes.size > 300 * 1024) {
-                        // If still too large, resize it
-                        val scale = 0.8f
-                        val resizedBitmap = Bitmap.createScaledBitmap(
-                            bitmap, 
-                            (bitmap.width * scale).toInt(), 
-                            (bitmap.height * scale).toInt(), 
-                            true
-                        )
-                        val resizeStream = ByteArrayOutputStream()
-                        resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 70, resizeStream)
-                        finalImageBytes = resizeStream.toByteArray()
                     }
                 }
 
@@ -184,10 +252,90 @@ class BookViewModel : ViewModel() {
                 )
 
                 postgrest["books"].insert(book)
-                fetchBooks() // Refresh the list
                 onSuccess()
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to add book"
+            } finally {
+                _loading.value = false
+            }
+        }
+    }
+
+    fun updateBook(
+        bookId: Long,
+        title: String,
+        description: String,
+        category: String,
+        isForRent: Boolean,
+        isAvailable: Boolean,
+        rentalPrice: Double?,
+        imageBytes: ByteArray?,
+        existingImageUrl: String?,
+        onSuccess: () -> Unit
+    ) {
+        if (title.isBlank() || description.isBlank()) {
+            _error.value = "Please fill in all fields"
+            return
+        }
+
+        _loading.value = true
+        _error.value = null
+
+        // OPTIMISTIC LOCAL UPDATE
+        val index = _books.indexOfFirst { it.id == bookId }
+        if (index != -1) {
+            _books[index] = _books[index].copy(
+                title = title,
+                description = description,
+                category = category,
+                isForRent = isForRent,
+                isAvailable = isAvailable,
+                rentalPricePerDay = if (isForRent) rentalPrice else null
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                var finalImageUrl = existingImageUrl
+
+                if (imageBytes != null) {
+                    var quality = 80
+                    var bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                    
+                    val outputStream = ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+                    var compressedBytes = outputStream.toByteArray()
+                    
+                    while (compressedBytes.size > 300 * 1024 && quality > 10) {
+                        quality -= 10
+                        val loopStream = ByteArrayOutputStream()
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, loopStream)
+                        compressedBytes = loopStream.toByteArray()
+                    }
+                    
+                    val fileName = "${UUID.randomUUID()}.jpg"
+                    val bucket = storage.from("book-images")
+                    bucket.upload(fileName, compressedBytes)
+                    finalImageUrl = bucket.publicUrl(fileName)
+                }
+
+                postgrest["books"].update({
+                    Book::title setTo title
+                    Book::description setTo description
+                    Book::category setTo category
+                    Book::isForRent setTo isForRent
+                    Book::isAvailable setTo isAvailable
+                    Book::rentalPricePerDay setTo (if (isForRent) rentalPrice else null)
+                    Book::imageUrl setTo finalImageUrl
+                }) {
+                    filter {
+                        eq("id", bookId)
+                    }
+                }
+                onSuccess()
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Failed to update book"
+                fetchBooks() // Restore on error
             } finally {
                 _loading.value = false
             }
