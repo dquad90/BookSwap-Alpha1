@@ -32,6 +32,7 @@ fun SignUpScreen(
     onLoginClick: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
@@ -67,13 +68,14 @@ fun SignUpScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .systemBarsPadding()
-                .imePadding()
+                .imePadding() // Ensures layout moves up when keyboard appears
                 .padding(horizontal = if (windowSize.widthSizeClass == WindowSizeClass.EXPANDED) 120.dp else 32.dp)
                 .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(if (windowSize.heightSizeClass == WindowSizeClass.COMPACT) 20.dp else 40.dp))
             
+            // Top Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -114,6 +116,17 @@ fun SignUpScreen(
                 onValueChange = { name = it; viewModel.clearError() },
                 label = { Text("Full Name") },
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = TextFieldDefaults.colors(unfocusedContainerColor = Color.Transparent, focusedContainerColor = Color.Transparent)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            TextField(
+                value = username,
+                onValueChange = { username = it; viewModel.clearError() },
+                label = { Text("Username") },
+                leadingIcon = { Icon(Icons.Default.AlternateEmail, contentDescription = null) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = TextFieldDefaults.colors(unfocusedContainerColor = Color.Transparent, focusedContainerColor = Color.Transparent)
             )
@@ -177,7 +190,7 @@ fun SignUpScreen(
                 CircularProgressIndicator(color = CyanMain)
             } else {
                 Button(
-                    onClick = { viewModel.signUp(email, password, name, phone, address) { onSignUpSuccess(email) } },
+                    onClick = { viewModel.signUp(email, password, name, username, phone, address) { onSignUpSuccess(email) } },
                     modifier = Modifier.fillMaxWidth().height(if (windowSize.widthSizeClass == WindowSizeClass.COMPACT) 50.dp else 64.dp),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = CyanMain)

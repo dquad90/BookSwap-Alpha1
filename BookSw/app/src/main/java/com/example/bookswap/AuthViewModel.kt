@@ -31,6 +31,9 @@ class AuthViewModel : ViewModel() {
     private val _profile = mutableStateOf<Profile?>(null)
     val profile: State<Profile?> = _profile
 
+    private val _viewedProfile = mutableStateOf<Profile?>(null)
+    val viewedProfile: State<Profile?> = _viewedProfile
+
     init {
         if (_user.value != null) {
             fetchProfile()
@@ -48,8 +51,55 @@ class AuthViewModel : ViewModel() {
                 }.decodeSingle<Profile>()
                 _profile.value = result
             } catch (e: Exception) {
-                // Profile might not exist yet if trigger failed or sync is slow
                 _error.value = "Failed to load profile: ${e.message}"
+            }
+        }
+    }
+
+    fun fetchUserProfile(userId: String) {
+        _loading.value = true
+        viewModelScope.launch {
+            try {
+                val result = postgrest["profiles"].select {
+                    filter {
+                        eq("id", userId)
+                    }
+                }.decodeSingle<Profile>()
+                _viewedProfile.value = result
+            } catch (e: Exception) {
+                _error.value = "Failed to load user profile: ${e.message}"
+            } finally {
+                _loading.value = false
+            }
+        }
+    }
+
+    fun clearViewedProfile() {
+        _viewedProfile.value = null
+    }
+
+    fun updateProfile(fullName: String, username: String, phone: String, address: String, onSuccess: () -> Unit) {
+        val currentUser = auth.currentUserOrNull() ?: return
+        _loading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            try {
+                postgrest["profiles"].update({
+                    Profile::fullName setTo fullName
+                    Profile::username setTo username
+                    Profile::phone setTo phone
+                    Profile::address setTo address
+                }) {
+                    filter {
+                        eq("id", currentUser.id)
+                    }
+                }
+                fetchProfile()
+                onSuccess()
+            } catch (e: Exception) {
+                _error.value = "Failed to update profile: ${e.message}"
+            } finally {
+                _loading.value = false
             }
         }
     }
@@ -68,7 +118,10 @@ class AuthViewModel : ViewModel() {
                 } else {
                     val response = postgrest["profiles"].select {
                         filter {
-                            eq("full_name", identifier)
+                            or {
+                                eq("full_name", identifier)
+                                eq("username", identifier)
+                            }
                         }
                     }
                     val data = response.decodeList<Profile>()
@@ -105,11 +158,12 @@ class AuthViewModel : ViewModel() {
         email: String,
         password: String,
         name: String,
+        username: String,
         phone: String,
         address: String,
         onSuccess: () -> Unit
     ) {
-        if (email.isBlank() || password.isBlank() || name.isBlank() || phone.isBlank() || address.isBlank()) {
+        if (email.isBlank() || password.isBlank() || name.isBlank() || username.isBlank() || phone.isBlank() || address.isBlank()) {
             _error.value = "Please fill in all fields"
             return
         }
@@ -122,6 +176,7 @@ class AuthViewModel : ViewModel() {
                     this.password = password
                     data = buildJsonObject {
                         put("full_name", name)
+                        put("username", username)
                         put("phone", phone)
                         put("address", address)
                     }
@@ -203,6 +258,7 @@ data class Profile(
     val id: String? = null,
     @SerialName("full_name")
     val fullName: String,
+    val username: String? = null,
     val email: String,
     val phone: String? = null,
     val address: String? = null

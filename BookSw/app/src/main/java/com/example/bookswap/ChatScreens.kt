@@ -25,6 +25,7 @@ fun ChatListScreen(
     viewModel: ChatViewModel,
     currentUserId: String,
     onChatClick: (Long) -> Unit,
+    onProfileClick: (String) -> Unit,
     onBack: () -> Unit
 ) {
     val chatRequests = viewModel.chatRequests
@@ -53,8 +54,11 @@ fun ChatListScreen(
             ) {
                 items(chatRequests) { request ->
                     val isReceiver = request.receiverId == currentUserId
-                    val otherPartyLabel = if (isReceiver) "From: Someone" else "To: Owner"
-                    
+                    val otherPartyName = if (isReceiver) request.senderName else request.receiverName
+                    val otherPartyUsername = if (isReceiver) request.senderUsername else request.receiverUsername
+                    val otherPartyId = if (isReceiver) request.senderId else request.receiverId
+                    val label = if (isReceiver) "From: " else "To: "
+
                     Card(
                         modifier = Modifier.fillMaxWidth().clickable { 
                             if (request.status == "accepted" || !isReceiver) {
@@ -70,16 +74,44 @@ fun ChatListScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
-                                modifier = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFE3F2FD)),
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFE3F2FD))
+                                    .clickable { onProfileClick(otherPartyId) },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF1976D2))
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(otherPartyLabel, fontWeight = FontWeight.Bold)
-                                Text("Request: ${request.type.replaceFirstChar { it.uppercase() }}", fontSize = 12.sp, color = Color.Gray)
-                                Text("Status: ${request.status}", fontSize = 12.sp, color = if (request.status == "accepted") Color(0xFF4CAF50) else Color(0xFFFF9800))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(label, fontSize = 12.sp, color = Color.Gray)
+                                    Text(
+                                        text = otherPartyName ?: "User",
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.clickable { onProfileClick(otherPartyId) }
+                                    )
+                                    if (otherPartyUsername != null) {
+                                        Text(
+                                            text = " @$otherPartyUsername",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(start = 4.dp).clickable { onProfileClick(otherPartyId) }
+                                        )
+                                    }
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                                    Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(request.bookTitle ?: "Book", fontSize = 13.sp, color = Color.DarkGray)
+                                }
+                                Text(
+                                    text = "Status: ${request.status.replaceFirstChar { it.uppercase() }}",
+                                    fontSize = 12.sp,
+                                    color = if (request.status == "accepted") Color(0xFF4CAF50) else Color(0xFFFF9800),
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
                             }
                             
                             if (isReceiver && request.status == "pending") {
@@ -91,6 +123,8 @@ fun ChatListScreen(
                                         Icon(Icons.Default.Cancel, contentDescription = "Reject", tint = Color(0xFFF44336))
                                     }
                                 }
+                            } else {
+                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.LightGray)
                             }
                         }
                     }
@@ -106,19 +140,50 @@ fun ChatMessagesScreen(
     viewModel: ChatViewModel,
     requestId: Long,
     currentUserId: String,
+    onProfileClick: (String) -> Unit,
     onBack: () -> Unit
 ) {
     var messageText by remember { mutableStateOf("") }
     val messages = viewModel.messages
+    val request = viewModel.chatRequests.find { it.id == requestId }
+    val otherPartyName = if (request?.receiverId == currentUserId) request?.senderName else request?.receiverName
+    val otherPartyUsername = if (request?.receiverId == currentUserId) request?.senderUsername else request?.receiverUsername
+    val otherPartyId = if (request?.receiverId == currentUserId) request?.senderId else request?.receiverId
 
     LaunchedEffect(requestId) {
         viewModel.fetchMessages(requestId)
+        viewModel.startListeningToMessages(requestId)
+    }
+
+    DisposableEffect(requestId) {
+        onDispose {
+            viewModel.stopListeningToMessages()
+        }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Chat", fontWeight = FontWeight.Bold) },
+                title = { 
+                    Column(
+                        modifier = Modifier
+                            .clickable { otherPartyId?.let { onProfileClick(it) } }
+                            .padding(4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(otherPartyName ?: "Chat", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            if (otherPartyUsername != null) {
+                                Text(
+                                    text = " @$otherPartyUsername",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(start = 4.dp)
+                                )
+                            }
+                        }
+                        request?.bookTitle?.let { Text(it, fontSize = 12.sp, color = Color.Gray) }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")

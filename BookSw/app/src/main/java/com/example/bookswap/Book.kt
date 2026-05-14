@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 data class Book(
     val id: Long? = null,
     val title: String,
+    val author: String = "Unknown", // Added for Explore
     val owner: String,
     @SerialName("owner_id")
     val ownerId: String? = null,
@@ -22,8 +23,9 @@ data class Book(
     @SerialName("image_url")
     val imageUrl: String? = null,
     val category: String = "Fiction",
+    val location: String = "Nearby", // Added for Explore
     @SerialName("created_at")
-    val createdAt: String? = null // Added to track when the book was published
+    val createdAt: String? = null
 )
 
 @Serializable
@@ -33,30 +35,4 @@ data class Favorite(
     val userId: String,
     @SerialName("book_id")
     val bookId: Long
-)
-
-val sampleBooks = listOf(
-    Book(
-        id = 1,
-        title = "The Alchemist",
-        owner = "John Doe",
-        rating = 4.8,
-        swaps = 12,
-        description = "A global phenomenon...",
-        isAvailable = true,
-        isForRent = true,
-        rentalPricePerDay = 2.5,
-        category = "Fiction"
-    ),
-    Book(
-        id = 2,
-        title = "Atomic Habits",
-        owner = "Jane Smith",
-        rating = 4.9,
-        swaps = 8,
-        description = "No matter your goals...",
-        isAvailable = false,
-        isForRent = false,
-        category = "Business"
-    )
 )

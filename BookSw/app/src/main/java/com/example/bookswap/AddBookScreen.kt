@@ -37,6 +37,8 @@ fun AddBookScreen(
     onBookAdded: () -> Unit
 ) {
     var title by remember { mutableStateOf("") }
+    var author by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var isForRent by remember { mutableStateOf(false) }
     var rentalPrice by remember { mutableStateOf("") }
@@ -146,7 +148,6 @@ fun AddBookScreen(
                 }
             }
 
-            // Image size warning
             Text(
                 text = "Note: Images will be automatically compressed to under 300KB.",
                 color = Color.Gray,
@@ -167,7 +168,28 @@ fun AddBookScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Category Selection
+            OutlinedTextField(
+                value = author,
+                onValueChange = { author = it; viewModel.clearError() },
+                label = { Text("Author") },
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = location,
+                onValueChange = { location = it; viewModel.clearError() },
+                label = { Text("Location (e.g., City)") },
+                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded },
@@ -249,8 +271,10 @@ fun AddBookScreen(
                         
                         viewModel.addBook(
                             title = title,
+                            author = author,
                             description = description,
                             category = selectedCategory,
+                            location = location,
                             isForRent = isForRent,
                             rentalPrice = rentalPrice.toDoubleOrNull(),
                             imageBytes = byteArray,

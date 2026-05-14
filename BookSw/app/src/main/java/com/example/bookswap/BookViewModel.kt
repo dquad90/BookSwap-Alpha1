@@ -169,6 +169,29 @@ class BookViewModel : ViewModel() {
         }
     }
 
+    fun rateBook(bookId: Long, newRating: Double) {
+        // Optimistic update
+        val index = _books.indexOfFirst { it.id == bookId }
+        if (index != -1) {
+            _books[index] = _books[index].copy(rating = newRating)
+        }
+
+        viewModelScope.launch {
+            try {
+                postgrest["books"].update({
+                    Book::rating setTo newRating
+                }) {
+                    filter {
+                        eq("id", bookId)
+                    }
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to rate book: ${e.message}"
+                fetchBooks()
+            }
+        }
+    }
+
     fun deleteBook(bookId: Long, onSuccess: () -> Unit) {
         // INSTANT LOCAL REMOVAL
         _books.removeAll { it.id == bookId }
@@ -190,8 +213,10 @@ class BookViewModel : ViewModel() {
 
     fun addBook(
         title: String,
+        author: String,
         description: String,
         category: String,
+        location: String,
         isForRent: Boolean,
         rentalPrice: Double?,
         imageBytes: ByteArray?,
@@ -239,6 +264,7 @@ class BookViewModel : ViewModel() {
                 
                 val book = Book(
                     title = title,
+                    author = author,
                     description = description,
                     owner = userName,
                     ownerId = currentUser.id,
@@ -248,7 +274,8 @@ class BookViewModel : ViewModel() {
                     isForRent = isForRent,
                     rentalPricePerDay = if (isForRent) rentalPrice else null,
                     imageUrl = imageUrl,
-                    category = category
+                    category = category,
+                    location = location
                 )
 
                 postgrest["books"].insert(book)
@@ -264,8 +291,10 @@ class BookViewModel : ViewModel() {
     fun updateBook(
         bookId: Long,
         title: String,
+        author: String,
         description: String,
         category: String,
+        location: String,
         isForRent: Boolean,
         isAvailable: Boolean,
         rentalPrice: Double?,
@@ -286,8 +315,10 @@ class BookViewModel : ViewModel() {
         if (index != -1) {
             _books[index] = _books[index].copy(
                 title = title,
+                author = author,
                 description = description,
                 category = category,
+                location = location,
                 isForRent = isForRent,
                 isAvailable = isAvailable,
                 rentalPricePerDay = if (isForRent) rentalPrice else null
@@ -321,8 +352,10 @@ class BookViewModel : ViewModel() {
 
                 postgrest["books"].update({
                     Book::title setTo title
+                    Book::author setTo author
                     Book::description setTo description
                     Book::category setTo category
+                    Book::location setTo location
                     Book::isForRent setTo isForRent
                     Book::isAvailable setTo isAvailable
                     Book::rentalPricePerDay setTo (if (isForRent) rentalPrice else null)

@@ -1,15 +1,22 @@
 package com.example.bookswap
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import com.example.bookswap.ui.theme.BookSwapTheme
 import kotlinx.coroutines.delay
 
@@ -21,8 +28,41 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Initialize Notification Channel
+        NotificationHelper.createNotificationChannel(this)
+
         setContent {
             BookSwapTheme {
+                val context = LocalContext.current
+                
+                // Permission Request for Android 13+
+                var hasNotificationPermission by remember {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        mutableStateOf(
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) == PackageManager.PERMISSION_GRANTED
+                        )
+                    } else {
+                        mutableStateOf(true)
+                    }
+                }
+
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission(),
+                    onResult = { isGranted ->
+                        hasNotificationPermission = isGranted
+                    }
+                )
+
+                LaunchedEffect(Unit) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
+
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -30,9 +70,9 @@ class MainActivity : ComponentActivity() {
                     var currentScreen by remember { mutableStateOf("splash") }
                     var selectedBookId by remember { mutableStateOf<Long?>(null) }
                     var selectedChatRequestId by remember { mutableStateOf<Long?>(null) }
+                    var viewingUserId by remember { mutableStateOf<String?>(null) }
                     var tempEmail by remember { mutableStateOf("") }
 
-                    // Logic to handle instant navigation if a book is deleted while viewing it
                     val bookExists = remember(selectedBookId, bookViewModel.books.size) {
                         selectedBookId == null || bookViewModel.books.any { it.id == selectedBookId }
                     }
@@ -48,6 +88,7 @@ class MainActivity : ComponentActivity() {
                             if (authViewModel.user.value != null) {
                                 bookViewModel.fetchBooks()
                                 chatViewModel.fetchChatRequests()
+                                chatViewModel.startListeningToRequests(context)
                                 authViewModel.fetchProfile()
                                 currentScreen = "home"
                             } else {
@@ -68,6 +109,7 @@ class MainActivity : ComponentActivity() {
                             onLoginSuccess = { 
                                 bookViewModel.fetchBooks()
                                 chatViewModel.fetchChatRequests()
+                                chatViewModel.startListeningToRequests(context)
                                 authViewModel.fetchProfile()
                                 currentScreen = "home" 
                             },
@@ -100,6 +142,7 @@ class MainActivity : ComponentActivity() {
                                 selectedBookId = book.id
                                 currentScreen = "details"
                             },
+                            onExploreClick = { currentScreen = "explore" },
                             onAddClick = { currentScreen = "add_book" },
                             onChatClick = {
                                 chatViewModel.fetchChatRequests()
@@ -112,6 +155,23 @@ class MainActivity : ComponentActivity() {
                             onLogout = {
                                 authViewModel.logout()
                                 currentScreen = "login"
+                            }
+                        )
+                        "explore" -> ExploreScreen(
+                            viewModel = bookViewModel,
+                            onBookClick = { book ->
+                                selectedBookId = book.id
+                                currentScreen = "details"
+                            },
+                            onHomeClick = { currentScreen = "home" },
+                            onAddClick = { currentScreen = "add_book" },
+                            onChatClick = {
+                                chatViewModel.fetchChatRequests()
+                                currentScreen = "chat_list"
+                            },
+                            onProfileClick = {
+                                authViewModel.fetchProfile()
+                                currentScreen = "profile"
                             }
                         )
                         "details" -> selectedBookId?.let { id ->
@@ -149,6 +209,15 @@ class MainActivity : ComponentActivity() {
                                 selectedChatRequestId = requestId
                                 currentScreen = "chat_messages"
                             },
+                            onProfileClick = { userId ->
+                                if (userId == currentUser?.id) {
+                                    currentScreen = "profile"
+                                } else {
+                                    viewingUserId = userId
+                                    authViewModel.fetchUserProfile(userId)
+                                    currentScreen = "view_profile"
+                                }
+                            },
                             onBack = { currentScreen = "home" }
                         )
                         "chat_messages" -> selectedChatRequestId?.let { requestId ->
@@ -156,6 +225,15 @@ class MainActivity : ComponentActivity() {
                                 viewModel = chatViewModel,
                                 requestId = requestId,
                                 currentUserId = currentUser?.id ?: "",
+                                onProfileClick = { userId ->
+                                    if (userId == currentUser?.id) {
+                                        currentScreen = "profile"
+                                    } else {
+                                        viewingUserId = userId
+                                        authViewModel.fetchUserProfile(userId)
+                                        currentScreen = "view_profile"
+                                    }
+                                },
                                 onBack = { currentScreen = "chat_list" }
                             )
                         }
@@ -181,6 +259,9 @@ class MainActivity : ComponentActivity() {
                                     selectedBookId = book.id
                                     currentScreen = "details"
                                 },
+                                onUpdateProfile = { name, username, phone, address ->
+                                    authViewModel.updateProfile(name, username, phone, address) {}
+                                },
                                 onBack = { currentScreen = "home" },
                                 onLogout = {
                                     authViewModel.logout()
@@ -188,7 +269,40 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onAddBookClick = {
                                     currentScreen = "add_book"
-                                }
+                                },
+                                onSwapRequestsClick = {
+                                    currentScreen = "chat_list"
+                                },
+                                isCurrentUser = true,
+                                chatViewModel = chatViewModel
+                            )
+                        }
+                        "view_profile" -> viewingUserId?.let { userId ->
+                            val userProfile = authViewModel.viewedProfile.value
+                            val userBooks = bookViewModel.books.filter { it.ownerId == userId }
+                            val userSwapsCount = chatViewModel.chatRequests.count { 
+                                (it.senderId == userId || it.receiverId == userId) && it.status == "accepted" 
+                            }
+
+                            ProfileScreen(
+                                userName = userProfile?.fullName ?: "User",
+                                profile = userProfile,
+                                booksCount = userBooks.size,
+                                swapsCount = userSwapsCount,
+                                favoritesCount = 0,
+                                wishlistCount = 0,
+                                ratingCount = 0,
+                                myBooks = userBooks,
+                                onBookClick = { book ->
+                                    selectedBookId = book.id
+                                    currentScreen = "details"
+                                },
+                                onBack = { 
+                                    currentScreen = "chat_list"
+                                    authViewModel.clearViewedProfile()
+                                },
+                                isCurrentUser = false,
+                                chatViewModel = chatViewModel
                             )
                         }
                         "add_book" -> AddBookScreen(

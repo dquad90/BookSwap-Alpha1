@@ -39,6 +39,8 @@ fun EditBookScreen(
     onBookUpdated: () -> Unit
 ) {
     var title by remember { mutableStateOf(book.title) }
+    var author by remember { mutableStateOf(book.author) }
+    var location by remember { mutableStateOf(book.location) }
     var description by remember { mutableStateOf(book.description) }
     var isAvailable by remember { mutableStateOf(book.isAvailable) }
     var isForRent by remember { mutableStateOf(book.isForRent) }
@@ -149,6 +151,26 @@ fun EditBookScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            OutlinedTextField(
+                value = author,
+                onValueChange = { author = it; viewModel.clearError() },
+                label = { Text("Author") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = location,
+                onValueChange = { location = it; viewModel.clearError() },
+                label = { Text("Location") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded },
@@ -189,7 +211,6 @@ fun EditBookScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // NEW: Availability Toggle inside Edit Screen
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -239,10 +260,12 @@ fun EditBookScreen(
                             viewModel.updateBook(
                                 bookId = id,
                                 title = title,
+                                author = author,
                                 description = description,
                                 category = selectedCategory,
+                                location = location,
                                 isForRent = isForRent,
-                                isAvailable = isAvailable, // Now correctly passing
+                                isAvailable = isAvailable,
                                 rentalPrice = rentalPrice.toDoubleOrNull(),
                                 imageBytes = byteArray,
                                 existingImageUrl = book.imageUrl,
