@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -29,17 +30,29 @@ fun HomeScreen(
     onExploreClick: () -> Unit,
     onAddClick: () -> Unit,
     onChatClick: () -> Unit,
+    onChatRequestClick: (Long) -> Unit,
     onProfileClick: () -> Unit,
     onLogout: () -> Unit,
-    viewModel: BookViewModel
+    bookViewModel: BookViewModel,
+    chatViewModel: ChatViewModel
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-    val categories = listOf("All", "Fiction", "Science", "Business", "History", "Arts")
-    var selectedCategory by remember { mutableStateOf("All") }
     val windowSize = rememberWindowSize()
     
-    val books = viewModel.books
-    val favoriteBookIds = viewModel.favorites
+    val books = bookViewModel.books
+    val favoriteBookIds = bookViewModel.favorites
+    val chatRequests = chatViewModel.chatRequests
+    
+    val activeSwaps = chatRequests.filter { it.status == "pending" || it.status == "accepted" }
+    
+    val recommendedBooks = remember(books, favoriteBookIds) {
+        val favoriteCategories = books.filter { it.id in favoriteBookIds }.map { it.category }.distinct()
+        if (favoriteCategories.isEmpty()) {
+            books.shuffled().take(5)
+        } else {
+            books.filter { it.category in favoriteCategories && it.id !in favoriteBookIds }.take(5)
+                .ifEmpty { books.shuffled().take(5) }
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -80,16 +93,6 @@ fun HomeScreen(
             }
         }
     ) { paddingValues ->
-        val filteredBooks = books.filter { book ->
-            val matchesCategory = selectedCategory == "All" || book.category == selectedCategory
-            val matchesSearch = searchQuery.isBlank() || 
-                book.title.contains(searchQuery, ignoreCase = true) || 
-                book.description.contains(searchQuery, ignoreCase = true) ||
-                book.owner.contains(searchQuery, ignoreCase = true)
-            
-            matchesCategory && matchesSearch
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -97,7 +100,7 @@ fun HomeScreen(
                 .background(Color(0xFFF8F9FA))
                 .verticalScroll(rememberScrollState())
         ) {
-            // Header
+            // Header with constraints
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -105,10 +108,18 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(text = "Hello there!", color = Color.Gray, fontSize = 14.sp)
-                    Text(text = "$userName!", color = Color.Black, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Welcome back,", color = Color.Gray, fontSize = 14.sp)
+                    Text(
+                        text = "$userName!", 
+                        color = Color.Black, 
+                        fontSize = 24.sp, 
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
+                Spacer(modifier = Modifier.width(16.dp))
                 Surface(
                     modifier = Modifier.size(48.dp),
                     shape = CircleShape,
@@ -128,99 +139,126 @@ fun HomeScreen(
                 }
             }
 
-            // Search Bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                placeholder = { Text("Search for books, authors...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, contentDescription = null) }
-                    }
-                },
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFE3F2FD),
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White
-                )
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Categories
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(categories) { category ->
-                    FilterChip(
-                        selected = category == selectedCategory,
-                        onClick = { selectedCategory = category },
-                        label = { Text(category) },
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = if (searchQuery.isEmpty()) "Featured Books" else "Search Results",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (filteredBooks.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                    Text("No books found", color = Color.Gray)
-                }
-            } else {
+            // 1. Active Swaps Section
+            if (activeSwaps.isNotEmpty()) {
+                SectionHeader(title = "Active Swaps", onSeeAll = onChatClick)
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(filteredBooks) { book ->
-                        BookCard(
-                            book = book,
-                            isFavorite = favoriteBookIds.contains(book.id),
-                            onFavoriteToggle = { book.id?.let { viewModel.toggleFavorite(it) } },
-                            onClick = { onBookClick(book) },
-                            backgroundColor = if (book.id == 1L) Color(0xFFFFE5E5) else Color(0xFFFFF3E0),
-                            windowSize = windowSize
-                        )
+                    items(activeSwaps) { request ->
+                        ActiveSwapItem(request = request, onClick = { request.id?.let { onChatRequestClick(it) } })
                     }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            // 2. Recommended for You
+            SectionHeader(title = "Recommended for You", onSeeAll = onExploreClick)
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                items(recommendedBooks) { book ->
+                    BookCard(
+                        book = book,
+                        isFavorite = favoriteBookIds.contains(book.id),
+                        onFavoriteToggle = { book.id?.let { bookViewModel.toggleFavorite(it) } },
+                        onClick = { onBookClick(book) },
+                        backgroundColor = Color.White,
+                        windowSize = windowSize,
+                        width = 160.dp,
+                        height = 240.dp
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            if (searchQuery.isEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "Recently Added", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    TextButton(onClick = onExploreClick) { Text("See All") }
-                }
-
-                Column(
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    books.take(3).forEach { book ->
-                        RecentBookRow(book = book, onClick = { onBookClick(book) })
-                    }
+            // 3. New Arrivals
+            SectionHeader(title = "New Arrivals", onSeeAll = onExploreClick)
+            Column(
+                modifier = Modifier.padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                books.take(5).forEach { book ->
+                    RecentBookRow(book = book, onClick = { onBookClick(book) })
                 }
             }
+            
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+fun SectionHeader(title: String, onSeeAll: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title, 
+            fontSize = 20.sp, 
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        TextButton(onClick = onSeeAll, contentPadding = PaddingValues(start = 8.dp)) {
+            Text("See All", color = Color(0xFF1976D2), softWrap = false)
+        }
+    }
+}
+
+@Composable
+fun ActiveSwapItem(request: ChatRequest, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .width(200.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(if (request.status == "accepted") Color(0xFFE8F5E9) else Color(0xFFFFF3E0)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (request.status == "accepted") Icons.Default.SwapHoriz else Icons.Default.Pending,
+                    contentDescription = null,
+                    tint = if (request.status == "accepted") Color(0xFF4CAF50) else Color(0xFFFF9800),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = request.bookTitle ?: "Book Swap",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (request.status == "accepted") "Ongoing Chat" else "Pending Request",
+                    color = Color.Gray,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }

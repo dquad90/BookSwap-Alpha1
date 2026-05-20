@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -117,14 +118,14 @@ fun BookDetailsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                             Switch(
                                 checked = book.isAvailable,
                                 onCheckedChange = { book.id?.let { id -> bookViewModel.updateBookAvailability(id, it) } },
                                 colors = SwitchDefaults.colors(checkedThumbColor = CyanMain)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(if (book.isAvailable) "Available" else "Busy", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(if (book.isAvailable) "Available" else "Busy", fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                         }
                         Button(
                             onClick = onEditClick,
@@ -133,7 +134,7 @@ fun BookDetailsScreen(
                         ) {
                             Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Edit Info")
+                            Text("Edit Info", softWrap = false)
                         }
                     }
                 }
@@ -160,7 +161,7 @@ fun BookDetailsScreen(
                                 if (loading) {
                                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                                 } else {
-                                    Text("Swap Now", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                    Text("Swap Now", fontSize = 18.sp, fontWeight = FontWeight.Bold, softWrap = false)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(20.dp))
                                 }
@@ -187,7 +188,14 @@ fun BookDetailsScreen(
                             border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFE57373))
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                                Text("Rent for $${book.rentalPricePerDay}/day", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE57373))
+                                Text(
+                                    text = "Rent for $${book.rentalPricePerDay}/day", 
+                                    fontSize = 16.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = Color(0xFFE57373),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(0xFFE57373))
                             }
@@ -252,13 +260,27 @@ fun BookDetailsScreen(
                 Surface(modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = 0.6f)) {
                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = book.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = book.title, 
+                                color = Color.White, 
+                                fontSize = 20.sp, 
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.AccountCircle, contentDescription = null, tint = Color(0xFF4FC3F7), modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(text = if (isOwner) "You (Owner)" else book.owner, color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
+                                Text(
+                                    text = if (isOwner) "You (Owner)" else book.owner, 
+                                    color = Color.White.copy(alpha = 0.8f), 
+                                    fontSize = 14.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
+                        Spacer(modifier = Modifier.width(16.dp))
                         Column(horizontalAlignment = Alignment.End) {
                             Text("Swaps", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
                             Text(text = book.swaps.toString(), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -308,7 +330,8 @@ fun BookDetailsScreen(
                                 fontSize = 18.sp,
                                 fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal,
                                 color = if (selectedTabIndex == index) Color.Black else Color.Gray,
-                                modifier = Modifier.padding(bottom = 4.dp)
+                                modifier = Modifier.padding(bottom = 4.dp),
+                                softWrap = false
                             )
                             if (selectedTabIndex == index) {
                                 Box(

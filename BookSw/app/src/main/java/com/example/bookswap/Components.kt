@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -75,7 +76,8 @@ fun InfoChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color.DarkGray,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -85,10 +87,24 @@ fun InfoChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String
 fun DetailRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
     ) {
-        Text(text = label, color = Color.Gray, fontSize = 14.sp)
-        Text(text = value, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+        Text(
+            text = label, 
+            color = Color.Gray, 
+            fontSize = 14.sp,
+            modifier = Modifier.padding(end = 16.dp)
+        )
+        Text(
+            text = value, 
+            fontWeight = FontWeight.Medium, 
+            fontSize = 14.sp,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -138,6 +154,111 @@ fun RatingSliderDialog(
             }
         }
     )
+}
+
+@Composable
+fun SwapRequestItem(
+    request: ChatRequest,
+    currentUserId: String,
+    onAccept: () -> Unit,
+    onReject: () -> Unit,
+    onChatClick: () -> Unit
+) {
+    val isIncoming = request.receiverId == currentUserId
+    val statusColor = when (request.status) {
+        "accepted" -> Color(0xFF4CAF50)
+        "rejected" -> Color(0xFFF44336)
+        else -> Color(0xFFFF9800)
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(enabled = request.status == "accepted") { onChatClick() },
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 2.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(if (isIncoming) Color(0xFFE3F2FD) else Color(0xFFF5F5F5)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isIncoming) Icons.Default.CallReceived else Icons.Default.CallMade,
+                        contentDescription = null,
+                        tint = if (isIncoming) Color(0xFF1976D2) else Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isIncoming) "Incoming" else "Sent",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                    Text(
+                        text = request.bookTitle ?: "Unknown Book",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Surface(
+                    color = statusColor.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = request.status.replaceFirstChar { it.uppercase() },
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            val personLabel = if (isIncoming) "From: ${request.senderName}" else "To: ${request.receiverName}"
+            Text(
+                text = personLabel,
+                fontSize = 14.sp,
+                color = Color.DarkGray
+            )
+            
+            if (isIncoming && request.status == "pending") {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = onReject,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Red)
+                    ) {
+                        Text("Reject")
+                    }
+                    Button(
+                        onClick = onAccept,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                    ) {
+                        Text("Accept", fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else if (request.status == "accepted") {
+                Text(
+                    text = "Tap to chat",
+                    fontSize = 12.sp,
+                    color = Color(0xFF1976D2),
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable

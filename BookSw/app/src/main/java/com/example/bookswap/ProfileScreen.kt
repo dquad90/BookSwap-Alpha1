@@ -12,7 +12,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -47,7 +46,6 @@ fun ProfileScreen(
     swapsCount: Int,
     favoritesCount: Int,
     wishlistCount: Int,
-    ratingCount: Int,
     myBooks: List<Book> = emptyList(),
     favoriteBooks: List<Book> = emptyList(),
     onBookClick: (Book) -> Unit = {},
@@ -55,20 +53,33 @@ fun ProfileScreen(
     onBack: () -> Unit,
     onLogout: () -> Unit = {},
     onAddBookClick: () -> Unit = {},
-    onWishlistClick: () -> Unit = {},
+    onSeeAllWishlist: () -> Unit = {},
+    onSeeAllMyBooks: () -> Unit = {},
+    onSeeAllFavorites: () -> Unit = {},
     onSwapRequestsClick: () -> Unit = {},
+    onChatClick: (Long) -> Unit = {},
     isCurrentUser: Boolean = true,
-    chatViewModel: ChatViewModel? = null
+    chatViewModel: ChatViewModel? = null,
+    initialTabIndex: Int = 0,
+    bookViewModel: BookViewModel? = null
 ) {
     val scrollState = rememberScrollState()
     val windowSize = rememberWindowSize()
     var showPersonalInfo by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = if (isCurrentUser) listOf("My Books", "Favorites", "Swaps") else listOf("Books", "Swaps")
+    var selectedTabIndex by remember { mutableIntStateOf(initialTabIndex) }
+    
+    // Updated tabs: Wishlist instead of Swaps
+    val tabs = if (isCurrentUser) listOf("My Books", "Favorites", "Wishlist") else listOf("Books")
 
-    val pendingRequestsCount = remember(chatViewModel?.chatRequests) {
-        chatViewModel?.chatRequests?.count { it.status == "pending" && it.receiverId == profile?.id } ?: 0
+    val chatRequests = chatViewModel?.chatRequests ?: emptyList()
+    val pendingRequestsCount = remember(chatRequests) {
+        chatRequests.count { it.status == "pending" && it.receiverId == profile?.id }
+    }
+    
+    val wishlistBooks = remember(bookViewModel?.books, bookViewModel?.wishlist) {
+        val ids = bookViewModel?.wishlist ?: emptyList()
+        bookViewModel?.books?.filter { it.id in ids } ?: emptyList()
     }
 
     if (showEditDialog && profile != null && isCurrentUser) {
@@ -251,7 +262,7 @@ fun ProfileScreen(
             }
         }
 
-        // Stat Cards Row - Enforcing uniform height and equal distribution
+        // Stat Cards Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -264,7 +275,8 @@ fun ProfileScreen(
                 label = "Books", 
                 icon = Icons.Default.MenuBook, 
                 color = Color(0xFFE8F5E9), 
-                contentColor = Color(0xFF2E7D32)
+                contentColor = Color(0xFF2E7D32),
+                onClick = { selectedTabIndex = 0 }
             )
             if (isCurrentUser) {
                 StatCard(
@@ -293,7 +305,7 @@ fun ProfileScreen(
                     icon = Icons.Default.Bookmark, 
                     color = Color(0xFFF3E5F5), 
                     contentColor = Color(0xFF7B1FA2),
-                    onClick = onWishlistClick
+                    onClick = { selectedTabIndex = 2 }
                 )
             }
         }
@@ -332,122 +344,101 @@ fun ProfileScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp)
+                .padding(16.dp)
                 .heightIn(min = 200.dp)
         ) {
             when (selectedTabIndex) {
-                0 -> {
+                0 -> { // My Books
+                    TabHeader(
+                        title = if (isCurrentUser) "My Collection" else "Books",
+                        onSeeAll = if (myBooks.isNotEmpty()) onSeeAllMyBooks else null
+                    )
                     if (myBooks.isEmpty()) {
-                        Text(if (isCurrentUser) "You haven't listed any books yet." else "No books listed.", color = Color.Gray, fontSize = 14.sp)
+                        EmptyTabContent(message = if (isCurrentUser) "You haven't listed any books yet." else "No books listed.")
                     } else {
-                        myBooks.forEach { book ->
+                        myBooks.take(5).forEach { book ->
                             RecentBookRow(book = book, onClick = { onBookClick(book) })
                             Spacer(modifier = Modifier.height(12.dp))
                         }
                     }
                 }
-                1 -> {
+                1 -> { // Favorites
                     if (isCurrentUser) {
+                        TabHeader(
+                            title = "Favorite Books",
+                            onSeeAll = if (favoriteBooks.isNotEmpty()) onSeeAllFavorites else null
+                        )
                         if (favoriteBooks.isEmpty()) {
-                            Text("No favorite books yet.", color = Color.Gray, fontSize = 14.sp)
+                            EmptyTabContent(message = "No favorite books yet.")
                         } else {
-                            favoriteBooks.forEach { book ->
+                            favoriteBooks.take(5).forEach { book ->
                                 RecentBookRow(book = book, onClick = { onBookClick(book) })
                                 Spacer(modifier = Modifier.height(12.dp))
                             }
                         }
                     } else {
-                        Text("Swap history.", color = Color.Gray, fontSize = 14.sp)
+                        EmptyTabContent(message = "No public swap history.")
                     }
                 }
-                2 -> Text("Your swap history will appear here.", color = Color.Gray, fontSize = 14.sp)
+                2 -> { // Wishlist
+                    if (isCurrentUser) {
+                        TabHeader(
+                            title = "My Wishlist",
+                            onSeeAll = if (wishlistBooks.isNotEmpty()) onSeeAllWishlist else null
+                        )
+                        if (wishlistBooks.isEmpty()) {
+                            EmptyTabContent(message = "No books in wishlist.")
+                        } else {
+                            wishlistBooks.take(5).forEach { book ->
+                                RecentBookRow(book = book, onClick = { onBookClick(book) })
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // Information/Settings Section
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                if (isCurrentUser) "Settings" else "User Information",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-
-            // Notification Bar for Swap Requests (Internal - Under Settings Title)
-            if (isCurrentUser && pendingRequestsCount > 0) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clickable { onSwapRequestsClick() },
-                    color = Color(0xFFFFECB3),
-                    shape = RoundedCornerShape(16.dp),
-                    shadowElevation = 2.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFFFF8E1)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = Color(0xFFFFA000))
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Incoming Swap Requests!",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = Color(0xFF5D4037)
-                            )
-                            Text(
-                                "You have $pendingRequestsCount pending requests.",
-                                fontSize = 13.sp,
-                                color = Color(0xFF795548)
-                            )
-                        }
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFFFFA000))
-                    }
-                }
-            }
-
-            ProfileActionItem(
-                icon = Icons.Default.Badge,
-                title = "Personal Information",
-                subtitle = if (showPersonalInfo) "Hide details" else "View contact details",
-                onClick = { showPersonalInfo = !showPersonalInfo },
-                containerColor = Color(0xFFE1F5FE),
-                iconColor = Color(0xFF0288D1),
-                trailingIcon = if (showPersonalInfo) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown
-            )
-
-            AnimatedVisibility(
-                visible = showPersonalInfo,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
+        // Settings & Actions
+        if (isCurrentUser) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Text(
+                    "Settings & Management",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+
+                ProfileActionItem(
+                    icon = Icons.Default.Badge,
+                    title = "Personal Information",
+                    subtitle = if (showPersonalInfo) "Hide details" else "View contact details",
+                    onClick = { showPersonalInfo = !showPersonalInfo },
+                    containerColor = Color(0xFFE1F5FE),
+                    iconColor = Color(0xFF0288D1),
+                    trailingIcon = if (showPersonalInfo) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown
+                )
+
+                AnimatedVisibility(
+                    visible = showPersonalInfo,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
                 ) {
-                    if (isCurrentUser) {
-                        InfoItem(icon = Icons.Default.Email, label = "Registered Email", value = profile?.email ?: "N/A")
-                    }
-                    InfoItem(icon = Icons.Default.AlternateEmail, label = "Username", value = profile?.username?.let { "@$it" } ?: "N/A")
-                    InfoItem(icon = Icons.Default.Phone, label = "Phone", value = profile?.phone ?: "N/A")
-                    InfoItem(icon = Icons.Default.Home, label = "Address", value = profile?.address ?: "N/A")
-                    
-                    if (isCurrentUser) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        InfoItem(icon = Icons.Default.Email, label = "Email", value = profile?.email ?: "N/A")
+                        InfoItem(icon = Icons.Default.AlternateEmail, label = "Username", value = profile?.username?.let { "@$it" } ?: "N/A")
+                        InfoItem(icon = Icons.Default.Phone, label = "Phone", value = profile?.phone ?: "N/A")
+                        InfoItem(icon = Icons.Default.Home, label = "Address", value = profile?.address ?: "N/A")
+                        
                         Button(
                             onClick = { showEditDialog = true },
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -456,41 +447,71 @@ fun ProfileScreen(
                         ) {
                             Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Update Information")
+                            Text("Edit Profile Information")
                         }
                     }
                 }
-            }
-
-            if (isCurrentUser) {
-                ProfileActionItem(
-                    icon = Icons.Default.SwapCalls,
-                    title = "Swap Requests",
-                    subtitle = "Manage incoming and outgoing requests",
-                    onClick = onSwapRequestsClick,
-                    containerColor = Color(0xFFFFF3E0),
-                    iconColor = Color(0xFFFF9800)
-                )
 
                 ProfileActionItem(
                     icon = Icons.Default.Add,
                     title = "List a New Book",
-                    subtitle = "Share your books with others",
+                    subtitle = "Share your collection with the community",
                     onClick = onAddBookClick,
                     containerColor = Color(0xFFF3E5F5),
                     iconColor = Color(0xFF7B1FA2)
                 )
 
+                // Swap Manager - Under List a New Book
+                ProfileActionItem(
+                    icon = Icons.Default.SwapCalls,
+                    title = "Swap Manager",
+                    subtitle = "Manage all incoming and outgoing requests",
+                    onClick = onSwapRequestsClick,
+                    containerColor = Color(0xFFFFF3E0),
+                    iconColor = Color(0xFFFF9800),
+                    badgeCount = if (pendingRequestsCount > 0) pendingRequestsCount else null
+                )
+
                 ProfileActionItem(
                     icon = Icons.Default.Logout,
                     title = "Logout",
-                    subtitle = "Sign out of your account",
+                    subtitle = "Sign out of your session",
                     onClick = onLogout,
                     containerColor = Color(0xFFFFEBEE),
                     iconColor = Color(0xFFD32F2F)
                 )
             }
         }
+    }
+}
+
+@Composable
+fun TabHeader(title: String, onSeeAll: (() -> Unit)?) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.DarkGray)
+        if (onSeeAll != null) {
+            Text(
+                text = "See All", 
+                color = CyanMain, 
+                fontSize = 14.sp, 
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable { onSeeAll() }
+            )
+        }
+    }
+}
+
+@Composable
+fun EmptyTabContent(message: String) {
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = message, color = Color.Gray, fontSize = 14.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -528,7 +549,7 @@ fun StatCard(
 ) {
     Surface(
         modifier = modifier
-            .height(90.dp) // Fixed uniform height
+            .height(90.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(18.dp),
         color = Color.White,
@@ -577,7 +598,8 @@ fun ProfileActionItem(
     onClick: () -> Unit,
     containerColor: Color,
     iconColor: Color,
-    trailingIcon: ImageVector = Icons.Default.ChevronRight
+    trailingIcon: ImageVector = Icons.Default.ChevronRight,
+    badgeCount: Int? = null
 ) {
     Surface(
         modifier = Modifier
@@ -602,7 +624,26 @@ fun ProfileActionItem(
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    if (badgeCount != null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = Color.Red,
+                            shape = CircleShape,
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Text(
+                                text = badgeCount.toString(),
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.wrapContentHeight()
+                            )
+                        }
+                    }
+                }
                 Text(text = subtitle, color = Color.Gray, fontSize = 12.sp)
             }
             Icon(trailingIcon, contentDescription = null, tint = Color.LightGray)

@@ -71,7 +71,10 @@ class MainActivity : ComponentActivity() {
                     var selectedBookId by remember { mutableStateOf<Long?>(null) }
                     var selectedChatRequestId by remember { mutableStateOf<Long?>(null) }
                     var viewingUserId by remember { mutableStateOf<String?>(null) }
+                    var profileTabIndex by remember { mutableIntStateOf(0) }
                     var tempEmail by remember { mutableStateOf("") }
+                    var listTitle by remember { mutableStateOf("") }
+                    var listBooks by remember { mutableStateOf<List<Book>>(emptyList()) }
 
                     val bookExists = remember(selectedBookId, bookViewModel.books.size) {
                         selectedBookId == null || bookViewModel.books.any { it.id == selectedBookId }
@@ -137,7 +140,8 @@ class MainActivity : ComponentActivity() {
                         "home" -> HomeScreen(
                             userName = userName,
                             userPhotoUrl = currentProfile?.avatarUrl,
-                            viewModel = bookViewModel,
+                            bookViewModel = bookViewModel,
+                            chatViewModel = chatViewModel,
                             onBookClick = { book ->
                                 selectedBookId = book.id
                                 currentScreen = "details"
@@ -148,8 +152,13 @@ class MainActivity : ComponentActivity() {
                                 chatViewModel.fetchChatRequests()
                                 currentScreen = "chat_list"
                             },
+                            onChatRequestClick = { requestId ->
+                                selectedChatRequestId = requestId
+                                currentScreen = "chat_messages"
+                            },
                             onProfileClick = {
                                 authViewModel.fetchProfile()
+                                profileTabIndex = 0
                                 currentScreen = "profile"
                             },
                             onLogout = {
@@ -171,6 +180,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onProfileClick = {
                                 authViewModel.fetchProfile()
+                                profileTabIndex = 0
                                 currentScreen = "profile"
                             }
                         )
@@ -187,7 +197,7 @@ class MainActivity : ComponentActivity() {
                                 onEditClick = { currentScreen = "edit_book" },
                                 onRequestSent = {
                                     chatViewModel.fetchChatRequests()
-                                    currentScreen = "chat_list"
+                                    currentScreen = "swap_manager"
                                 }
                             )
                         }
@@ -211,6 +221,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onProfileClick = { userId ->
                                 if (userId == currentUser?.id) {
+                                    profileTabIndex = 0
                                     currentScreen = "profile"
                                 } else {
                                     viewingUserId = userId
@@ -227,6 +238,7 @@ class MainActivity : ComponentActivity() {
                                 currentUserId = currentUser?.id ?: "",
                                 onProfileClick = { userId ->
                                     if (userId == currentUser?.id) {
+                                        profileTabIndex = 0
                                         currentScreen = "profile"
                                     } else {
                                         viewingUserId = userId
@@ -252,7 +264,6 @@ class MainActivity : ComponentActivity() {
                                 swapsCount = mySwapsCount,
                                 favoritesCount = favoriteBooks.size,
                                 wishlistCount = bookViewModel.wishlist.size,
-                                ratingCount = 0,
                                 myBooks = myBooks,
                                 favoriteBooks = favoriteBooks,
                                 onBookClick = { book ->
@@ -270,14 +281,32 @@ class MainActivity : ComponentActivity() {
                                 onAddBookClick = {
                                     currentScreen = "add_book"
                                 },
-                                onWishlistClick = {
-                                    currentScreen = "wishlist"
+                                onSeeAllWishlist = {
+                                    listTitle = "My Wishlist"
+                                    listBooks = bookViewModel.books.filter { it.id in bookViewModel.wishlist }
+                                    currentScreen = "book_list"
+                                },
+                                onSeeAllMyBooks = {
+                                    listTitle = "My Collection"
+                                    listBooks = myBooks
+                                    currentScreen = "book_list"
+                                },
+                                onSeeAllFavorites = {
+                                    listTitle = "Favorite Books"
+                                    listBooks = favoriteBooks
+                                    currentScreen = "book_list"
                                 },
                                 onSwapRequestsClick = {
-                                    currentScreen = "chat_list"
+                                    currentScreen = "swap_manager"
+                                },
+                                onChatClick = { requestId ->
+                                    selectedChatRequestId = requestId
+                                    currentScreen = "chat_messages"
                                 },
                                 isCurrentUser = true,
-                                chatViewModel = chatViewModel
+                                chatViewModel = chatViewModel,
+                                initialTabIndex = profileTabIndex,
+                                bookViewModel = bookViewModel
                             )
                         }
                         "view_profile" -> viewingUserId?.let { userId ->
@@ -294,7 +323,6 @@ class MainActivity : ComponentActivity() {
                                 swapsCount = userSwapsCount,
                                 favoritesCount = 0,
                                 wishlistCount = 0,
-                                ratingCount = 0,
                                 myBooks = userBooks,
                                 onBookClick = { book ->
                                     selectedBookId = book.id
@@ -305,7 +333,8 @@ class MainActivity : ComponentActivity() {
                                     authViewModel.clearViewedProfile()
                                 },
                                 isCurrentUser = false,
-                                chatViewModel = chatViewModel
+                                chatViewModel = chatViewModel,
+                                bookViewModel = bookViewModel
                             )
                         }
                         "add_book" -> AddBookScreen(
@@ -331,8 +360,27 @@ class MainActivity : ComponentActivity() {
                             },
                             onProfileClick = {
                                 authViewModel.fetchProfile()
+                                profileTabIndex = 0
                                 currentScreen = "profile"
                             }
+                        )
+                        "book_list" -> BookListScreen(
+                            title = listTitle,
+                            books = listBooks,
+                            onBookClick = { book ->
+                                selectedBookId = book.id
+                                currentScreen = "details"
+                            },
+                            onBack = { currentScreen = "profile" }
+                        )
+                        "swap_manager" -> SwapManagerScreen(
+                            viewModel = chatViewModel,
+                            currentUserId = currentUser?.id ?: "",
+                            onChatClick = { requestId ->
+                                selectedChatRequestId = requestId
+                                currentScreen = "chat_messages"
+                            },
+                            onBack = { currentScreen = "profile" }
                         )
                     }
                 }

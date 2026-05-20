@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -28,7 +29,8 @@ fun ChatListScreen(
     onProfileClick: (String) -> Unit,
     onBack: () -> Unit
 ) {
-    val chatRequests = viewModel.chatRequests
+    // Only show ACCEPTED requests as "Messages"
+    val chatRequests = viewModel.chatRequests.filter { it.status == "accepted" }
 
     Scaffold(
         topBar = {
@@ -44,7 +46,12 @@ fun ChatListScreen(
     ) { padding ->
         if (chatRequests.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("No messages yet", color = Color.Gray)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Message, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.LightGray)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("No active conversations", color = Color.Gray)
+                    Text("Accepted swap requests will appear here", fontSize = 12.sp, color = Color.LightGray)
+                }
             }
         } else {
             LazyColumn(
@@ -57,13 +64,10 @@ fun ChatListScreen(
                     val otherPartyName = if (isReceiver) request.senderName else request.receiverName
                     val otherPartyUsername = if (isReceiver) request.senderUsername else request.receiverUsername
                     val otherPartyId = if (isReceiver) request.senderId else request.receiverId
-                    val label = if (isReceiver) "From: " else "To: "
 
                     Card(
                         modifier = Modifier.fillMaxWidth().clickable { 
-                            if (request.status == "accepted" || !isReceiver) {
-                                request.id?.let { onChatClick(it) }
-                            }
+                            request.id?.let { onChatClick(it) }
                         },
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -75,7 +79,7 @@ fun ChatListScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(52.dp)
                                     .clip(CircleShape)
                                     .background(Color(0xFFE3F2FD))
                                     .clickable { otherPartyId?.let { onProfileClick(it) } },
@@ -85,47 +89,26 @@ fun ChatListScreen(
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(label, fontSize = 12.sp, color = Color.Gray)
-                                    Text(
-                                        text = otherPartyName ?: "User",
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.clickable { otherPartyId?.let { onProfileClick(it) } }
-                                    )
-                                    if (otherPartyUsername != null) {
-                                        Text(
-                                            text = " @$otherPartyUsername",
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(start = 4.dp).clickable { otherPartyId?.let { onProfileClick(it) } }
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = otherPartyName ?: "User",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
                                     Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text(request.bookTitle ?: "Book", fontSize = 13.sp, color = Color.DarkGray)
+                                    Text(
+                                        text = request.bookTitle ?: "Book", 
+                                        fontSize = 13.sp, 
+                                        color = Color.Gray,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
-                                Text(
-                                    text = "Status: ${request.status.replaceFirstChar { it.uppercase() }}",
-                                    fontSize = 12.sp,
-                                    color = if (request.status == "accepted") Color(0xFF4CAF50) else Color(0xFFFF9800),
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
                             }
-                            
-                            if (isReceiver && request.status == "pending") {
-                                Row {
-                                    IconButton(onClick = { request.id?.let { viewModel.updateRequestStatus(it, "accepted") } }) {
-                                        Icon(Icons.Default.CheckCircle, contentDescription = "Accept", tint = Color(0xFF4CAF50))
-                                    }
-                                    IconButton(onClick = { request.id?.let { viewModel.updateRequestStatus(it, "rejected") } }) {
-                                        Icon(Icons.Default.Cancel, contentDescription = "Reject", tint = Color(0xFFF44336))
-                                    }
-                                }
-                            } else {
-                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.LightGray)
-                            }
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.LightGray)
                         }
                     }
                 }
@@ -188,7 +171,15 @@ fun ChatMessagesScreen(
                                 )
                             }
                         }
-                        request?.bookTitle?.let { Text(it, fontSize = 12.sp, color = Color.Gray) }
+                        request?.bookTitle?.let { 
+                            Text(
+                                text = "Swap: $it", 
+                                fontSize = 12.sp, 
+                                color = Color.Gray,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            ) 
+                        }
                     }
                 },
                 navigationIcon = {
@@ -199,9 +190,9 @@ fun ChatMessagesScreen(
             )
         },
         bottomBar = {
-            Surface(tonalElevation = 8.dp) {
+            Surface(tonalElevation = 8.dp, color = Color.White) {
                 Row(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    modifier = Modifier.padding(16.dp).navigationBarsPadding().fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextField(
@@ -212,7 +203,9 @@ fun ChatMessagesScreen(
                         shape = RoundedCornerShape(24.dp),
                         colors = TextFieldDefaults.colors(
                             focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedContainerColor = Color(0xFFF5F5F5),
+                            unfocusedContainerColor = Color(0xFFF5F5F5)
                         )
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -225,7 +218,7 @@ fun ChatMessagesScreen(
                         },
                         enabled = messageText.isNotBlank()
                     ) {
-                        Icon(Icons.Default.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.Send, contentDescription = "Send", tint = Color(0xFF1976D2))
                     }
                 }
             }
@@ -244,7 +237,7 @@ fun ChatMessagesScreen(
                     contentAlignment = if (isMe) Alignment.CenterEnd else Alignment.CenterStart
                 ) {
                     Surface(
-                        color = if (isMe) MaterialTheme.colorScheme.primary else Color(0xFFF0F0F0),
+                        color = if (isMe) Color(0xFF1976D2) else Color(0xFFF0F0F0),
                         shape = RoundedCornerShape(
                             topStart = 16.dp,
                             topEnd = 16.dp,
