@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +17,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -170,7 +172,11 @@ fun BookCard(
             }
 
             Surface(
-                modifier = Modifier.padding(12.dp).size(if (cardWidth < 200.dp) 32.dp else 36.dp).align(Alignment.TopEnd).clickable { onFavoriteToggle() },
+                modifier = Modifier
+                    .padding(12.dp)
+                    .size(if (cardWidth < 200.dp) 32.dp else 36.dp)
+                    .align(Alignment.TopEnd)
+                    .clickable { onFavoriteToggle() },
                 shape = CircleShape,
                 color = Color.Black.copy(alpha = 0.3f)
             ) {
@@ -188,9 +194,10 @@ fun BookCard(
                 color = Color.Black.copy(alpha = 0.5f)
             ) {
                 Column(modifier = Modifier.padding(8.dp)) {
-                    Text(text = book.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = if (cardWidth < 200.dp) 12.sp else 16.sp, maxLines = 1)
+                    Text(text = book.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = if (cardWidth < 200.dp) 12.sp else 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = book.owner, color = Color.White.copy(alpha = 0.8f), fontSize = if (cardWidth < 200.dp) 9.sp else 11.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                        val ownerDisplay = book.ownerUsername?.let { "@$it" } ?: book.owner
+                        Text(text = ownerDisplay, color = Color.White.copy(alpha = 0.8f), fontSize = if (cardWidth < 200.dp) 9.sp else 11.sp, maxLines = 1, modifier = Modifier.weight(1f), overflow = TextOverflow.Ellipsis)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD54F), modifier = Modifier.size(if (cardWidth < 200.dp) 10.dp else 14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -221,8 +228,9 @@ fun RecentBookRow(book: Book, onClick: () -> Unit) {
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(book.title, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1)
-                Text(book.owner, color = Color.Gray, fontSize = 14.sp, maxLines = 1)
+                Text(book.title, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val ownerDisplay = book.ownerUsername?.let { "@$it" } ?: book.owner
+                Text(ownerDisplay, color = Color.Gray, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD54F), modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))

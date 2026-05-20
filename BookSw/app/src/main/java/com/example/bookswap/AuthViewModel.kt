@@ -1,5 +1,6 @@
 package com.example.bookswap
 
+import android.graphics.Bitmap
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -9,15 +10,21 @@ import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
 import io.github.jan.supabase.gotrue.user.UserInfo
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.storage.storage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.ByteArrayOutputStream
+import java.util.UUID
 
 class AuthViewModel : ViewModel() {
     private val auth = supabase.auth
     private val postgrest = supabase.postgrest
+    private val storage = supabase.storage
 
     private val _loading = mutableStateOf(false)
     val loading: State<Boolean> = _loading
@@ -33,6 +40,8 @@ class AuthViewModel : ViewModel() {
 
     private val _viewedProfile = mutableStateOf<Profile?>(null)
     val viewedProfile: State<Profile?> = _viewedProfile
+
+    private var pendingAvatar: Bitmap? = null
 
     init {
         if (_user.value != null) {
@@ -50,8 +59,40 @@ class AuthViewModel : ViewModel() {
                     }
                 }.decodeSingle<Profile>()
                 _profile.value = result
+                
+                if (pendingAvatar != null) {
+                    uploadPendingAvatar()
+                }
             } catch (e: Exception) {
                 _error.value = "Failed to load profile: ${e.message}"
+            }
+        }
+    }
+
+    private fun uploadPendingAvatar() {
+        val avatar = pendingAvatar ?: return
+        val currentUser = auth.currentUserOrNull() ?: return
+        
+        viewModelScope.launch {
+            try {
+                val compressedBytes = compressImage(avatar)
+                // Path changed to match SQL Policy: folder must be the UID
+                val fileName = "${currentUser.id}/${UUID.randomUUID()}.jpg"
+                val bucket = storage.from("avatars")
+                bucket.upload(fileName, compressedBytes, upsert = true)
+                val avatarUrl = bucket.publicUrl(fileName)
+
+                postgrest["profiles"].update({
+                    Profile::avatarUrl setTo avatarUrl
+                }) {
+                    filter {
+                        eq("id", currentUser.id)
+                    }
+                }
+                pendingAvatar = null
+                fetchProfile()
+            } catch (e: Exception) {
+                println("Failed to upload pending avatar: ${e.message}")
             }
         }
     }
@@ -78,17 +119,52 @@ class AuthViewModel : ViewModel() {
         _viewedProfile.value = null
     }
 
-    fun updateProfile(fullName: String, username: String, phone: String, address: String, onSuccess: () -> Unit) {
+    private suspend fun compressImage(bitmap: Bitmap): ByteArray = withContext(Dispatchers.Default) {
+        var quality = 80
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+        var compressedBytes = outputStream.toByteArray()
+        
+        // Strictly enforcing the 300 KB limit
+        while (compressedBytes.size > 300 * 1024 && quality > 10) {
+            quality -= 10
+            val loopStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, loopStream)
+            compressedBytes = loopStream.toByteArray()
+        }
+        compressedBytes
+    }
+
+    fun updateProfile(
+        fullName: String, 
+        username: String, 
+        phone: String, 
+        address: String, 
+        avatarBitmap: Bitmap? = null,
+        onSuccess: () -> Unit
+    ) {
         val currentUser = auth.currentUserOrNull() ?: return
         _loading.value = true
         _error.value = null
         viewModelScope.launch {
             try {
+                var avatarUrl = _profile.value?.avatarUrl
+
+                if (avatarBitmap != null) {
+                    val compressedBytes = compressImage(avatarBitmap)
+                    // Path changed to match SQL Policy: folder must be the UID
+                    val fileName = "${currentUser.id}/${UUID.randomUUID()}.jpg"
+                    val bucket = storage.from("avatars")
+                    bucket.upload(fileName, compressedBytes, upsert = true)
+                    avatarUrl = bucket.publicUrl(fileName)
+                }
+
                 postgrest["profiles"].update({
                     Profile::fullName setTo fullName
                     Profile::username setTo username
                     Profile::phone setTo phone
                     Profile::address setTo address
+                    Profile::avatarUrl setTo avatarUrl
                 }) {
                     filter {
                         eq("id", currentUser.id)
@@ -161,6 +237,7 @@ class AuthViewModel : ViewModel() {
         username: String,
         phone: String,
         address: String,
+        avatarBitmap: Bitmap? = null,
         onSuccess: () -> Unit
     ) {
         if (email.isBlank() || password.isBlank() || name.isBlank() || username.isBlank() || phone.isBlank() || address.isBlank()) {
@@ -169,6 +246,9 @@ class AuthViewModel : ViewModel() {
         }
         _loading.value = true
         _error.value = null
+        
+        pendingAvatar = avatarBitmap
+        
         viewModelScope.launch {
             try {
                 auth.signUpWith(Email) {
@@ -261,5 +341,7 @@ data class Profile(
     val username: String? = null,
     val email: String,
     val phone: String? = null,
-    val address: String? = null
+    val address: String? = null,
+    @SerialName("avatar_url")
+    val avatarUrl: String? = null
 )

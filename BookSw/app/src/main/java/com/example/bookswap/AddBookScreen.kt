@@ -27,7 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.bookswap.ui.theme.CyanMain
-import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -149,7 +148,7 @@ fun AddBookScreen(
             }
 
             Text(
-                text = "Note: Images will be automatically compressed to under 300KB.",
+                text = "Note: Images will be automatically compressed for optimal performance.",
                 color = Color.Gray,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
@@ -265,10 +264,6 @@ fun AddBookScreen(
             } else {
                 Button(
                     onClick = {
-                        val stream = ByteArrayOutputStream()
-                        imageBitmap?.compress(Bitmap.CompressFormat.JPEG, 80, stream)
-                        val byteArray = if (imageBitmap != null) stream.toByteArray() else null
-                        
                         viewModel.addBook(
                             title = title,
                             author = author,
@@ -277,7 +272,7 @@ fun AddBookScreen(
                             location = location,
                             isForRent = isForRent,
                             rentalPrice = rentalPrice.toDoubleOrNull(),
-                            imageBytes = byteArray,
+                            imageBitmap = imageBitmap,
                             onSuccess = onBookAdded
                         )
                     },

@@ -136,7 +136,7 @@ class MainActivity : ComponentActivity() {
                         )
                         "home" -> HomeScreen(
                             userName = userName,
-                            userPhotoUrl = null,
+                            userPhotoUrl = currentProfile?.avatarUrl,
                             viewModel = bookViewModel,
                             onBookClick = { book ->
                                 selectedBookId = book.id
@@ -251,7 +251,7 @@ class MainActivity : ComponentActivity() {
                                 booksCount = myBooks.size,
                                 swapsCount = mySwapsCount,
                                 favoritesCount = favoriteBooks.size,
-                                wishlistCount = 0,
+                                wishlistCount = bookViewModel.wishlist.size,
                                 ratingCount = 0,
                                 myBooks = myBooks,
                                 favoriteBooks = favoriteBooks,
@@ -259,8 +259,8 @@ class MainActivity : ComponentActivity() {
                                     selectedBookId = book.id
                                     currentScreen = "details"
                                 },
-                                onUpdateProfile = { name, username, phone, address ->
-                                    authViewModel.updateProfile(name, username, phone, address) {}
+                                onUpdateProfile = { name, username, phone, address, bitmap ->
+                                    authViewModel.updateProfile(name, username, phone, address, bitmap) {}
                                 },
                                 onBack = { currentScreen = "home" },
                                 onLogout = {
@@ -269,6 +269,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onAddBookClick = {
                                     currentScreen = "add_book"
+                                },
+                                onWishlistClick = {
+                                    currentScreen = "wishlist"
                                 },
                                 onSwapRequestsClick = {
                                     currentScreen = "chat_list"
@@ -311,6 +314,24 @@ class MainActivity : ComponentActivity() {
                             onBookAdded = { 
                                 bookViewModel.fetchBooks()
                                 currentScreen = "home" 
+                            }
+                        )
+                        "wishlist" -> WishlistScreen(
+                            viewModel = bookViewModel,
+                            onBookClick = { book ->
+                                selectedBookId = book.id
+                                currentScreen = "details"
+                            },
+                            onHomeClick = { currentScreen = "home" },
+                            onExploreClick = { currentScreen = "explore" },
+                            onAddClick = { currentScreen = "add_book" },
+                            onChatClick = {
+                                chatViewModel.fetchChatRequests()
+                                currentScreen = "chat_list"
+                            },
+                            onProfileClick = {
+                                authViewModel.fetchProfile()
+                                currentScreen = "profile"
                             }
                         )
                     }

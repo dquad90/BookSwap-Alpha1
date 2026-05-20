@@ -62,7 +62,7 @@ fun ChatListScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth().clickable { 
                             if (request.status == "accepted" || !isReceiver) {
-                                onChatClick(request.id!!)
+                                request.id?.let { onChatClick(it) }
                             }
                         },
                         shape = RoundedCornerShape(16.dp),
@@ -78,7 +78,7 @@ fun ChatListScreen(
                                     .size(48.dp)
                                     .clip(CircleShape)
                                     .background(Color(0xFFE3F2FD))
-                                    .clickable { onProfileClick(otherPartyId) },
+                                    .clickable { otherPartyId?.let { onProfileClick(it) } },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF1976D2))
@@ -90,14 +90,14 @@ fun ChatListScreen(
                                     Text(
                                         text = otherPartyName ?: "User",
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.clickable { onProfileClick(otherPartyId) }
+                                        modifier = Modifier.clickable { otherPartyId?.let { onProfileClick(it) } }
                                     )
                                     if (otherPartyUsername != null) {
                                         Text(
                                             text = " @$otherPartyUsername",
                                             fontSize = 12.sp,
                                             color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(start = 4.dp).clickable { onProfileClick(otherPartyId) }
+                                            modifier = Modifier.padding(start = 4.dp).clickable { otherPartyId?.let { onProfileClick(it) } }
                                         )
                                     }
                                 }
@@ -116,10 +116,10 @@ fun ChatListScreen(
                             
                             if (isReceiver && request.status == "pending") {
                                 Row {
-                                    IconButton(onClick = { viewModel.updateRequestStatus(request.id!!, "accepted") }) {
+                                    IconButton(onClick = { request.id?.let { viewModel.updateRequestStatus(it, "accepted") } }) {
                                         Icon(Icons.Default.CheckCircle, contentDescription = "Accept", tint = Color(0xFF4CAF50))
                                     }
-                                    IconButton(onClick = { viewModel.updateRequestStatus(request.id!!, "rejected") }) {
+                                    IconButton(onClick = { request.id?.let { viewModel.updateRequestStatus(it, "rejected") } }) {
                                         Icon(Icons.Default.Cancel, contentDescription = "Reject", tint = Color(0xFFF44336))
                                     }
                                 }
@@ -146,9 +146,16 @@ fun ChatMessagesScreen(
     var messageText by remember { mutableStateOf("") }
     val messages = viewModel.messages
     val request = viewModel.chatRequests.find { it.id == requestId }
-    val otherPartyName = if (request?.receiverId == currentUserId) request?.senderName else request?.receiverName
-    val otherPartyUsername = if (request?.receiverId == currentUserId) request?.senderUsername else request?.receiverUsername
-    val otherPartyId = if (request?.receiverId == currentUserId) request?.senderId else request?.receiverId
+
+    val otherPartyName = remember(request) {
+        if (request?.receiverId == currentUserId) request.senderName else request?.receiverName
+    }
+    val otherPartyUsername = remember(request) {
+        if (request?.receiverId == currentUserId) request.senderUsername else request?.receiverUsername
+    }
+    val otherPartyId = remember(request) {
+        if (request?.receiverId == currentUserId) request.senderId else request?.receiverId
+    }
 
     LaunchedEffect(requestId) {
         viewModel.fetchMessages(requestId)

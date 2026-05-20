@@ -23,10 +23,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -175,22 +179,22 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Row(
+            Text(
+                text = buildAnnotatedString {
+                    append("Don't have an account? ")
+                    withStyle(style = SpanStyle(color = CyanMain, fontWeight = FontWeight.Bold)) {
+                        append("Sign Up")
+                    }
+                },
+                color = Color.Gray,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 32.dp)
-                    .navigationBarsPadding(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "Don't have an account? ", color = Color.Gray)
-                Text(
-                    text = "Sign Up",
-                    color = CyanMain,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onSignUpClick() }
-                )
-            }
+                    .navigationBarsPadding()
+                    .clickable { onSignUpClick() },
+                textAlign = TextAlign.Center,
+                fontSize = 14.sp
+            )
         }
     }
 }

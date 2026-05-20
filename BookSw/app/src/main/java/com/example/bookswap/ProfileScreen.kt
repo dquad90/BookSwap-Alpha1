@@ -1,5 +1,10 @@
 package com.example.bookswap
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -22,10 +27,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.bookswap.ui.theme.CyanMain
 
 @Composable
@@ -40,10 +51,11 @@ fun ProfileScreen(
     myBooks: List<Book> = emptyList(),
     favoriteBooks: List<Book> = emptyList(),
     onBookClick: (Book) -> Unit = {},
-    onUpdateProfile: (String, String, String, String) -> Unit = { _, _, _, _ -> },
+    onUpdateProfile: (String, String, String, String, Bitmap?) -> Unit = { _, _, _, _, _ -> },
     onBack: () -> Unit,
     onLogout: () -> Unit = {},
     onAddBookClick: () -> Unit = {},
+    onWishlistClick: () -> Unit = {},
     onSwapRequestsClick: () -> Unit = {},
     isCurrentUser: Boolean = true,
     chatViewModel: ChatViewModel? = null
@@ -64,12 +76,57 @@ fun ProfileScreen(
         var username by remember { mutableStateOf(profile.username ?: "") }
         var phone by remember { mutableStateOf(profile.phone ?: "") }
         var address by remember { mutableStateOf(profile.address ?: "") }
+        var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
+        val context = LocalContext.current
+
+        val launcher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri: Uri? ->
+            uri?.let {
+                val inputStream = context.contentResolver.openInputStream(it)
+                imageBitmap = BitmapFactory.decodeStream(inputStream)
+            }
+        }
 
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
-            title = { Text("Edit Personal Information", fontWeight = FontWeight.Bold) },
+            title = { Text("Edit Profile", fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.verticalScroll(rememberScrollState())
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFF5F5F5))
+                            .clickable { launcher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (imageBitmap != null) {
+                            androidx.compose.foundation.Image(
+                                bitmap = imageBitmap!!.asImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else if (profile.avatarUrl != null) {
+                            AsyncImage(
+                                model = profile.avatarUrl,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = Color.Gray)
+                        }
+                    }
+                    Text("Change Photo", fontSize = 12.sp, color = CyanMain)
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     OutlinedTextField(
                         value = fullName,
                         onValueChange = { fullName = it },
@@ -100,7 +157,7 @@ fun ProfileScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        onUpdateProfile(fullName, username, phone, address)
+                        onUpdateProfile(fullName, username, phone, address, imageBitmap)
                         showEditDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = CyanMain)
@@ -162,12 +219,21 @@ fun ProfileScreen(
                         .background(Color(0xFFE3F2FD)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(if (windowSize.widthSizeClass == WindowSizeClass.COMPACT) 60.dp else 80.dp),
-                        tint = Color(0xFF1976D2)
-                    )
+                    if (profile?.avatarUrl != null) {
+                        AsyncImage(
+                            model = profile.avatarUrl,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(if (windowSize.widthSizeClass == WindowSizeClass.COMPACT) 60.dp else 80.dp),
+                            tint = Color(0xFF1976D2)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -185,20 +251,50 @@ fun ProfileScreen(
             }
         }
 
+        // Stat Cards Row - Enforcing uniform height and equal distribution
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(24.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 16.dp, vertical = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            StatCard(count = booksCount.toString(), label = "Books", icon = Icons.Default.MenuBook, color = Color(0xFFE8F5E9), contentColor = Color(0xFF2E7D32))
+            StatCard(
+                modifier = Modifier.weight(1f),
+                count = booksCount.toString(), 
+                label = "Books", 
+                icon = Icons.Default.MenuBook, 
+                color = Color(0xFFE8F5E9), 
+                contentColor = Color(0xFF2E7D32)
+            )
             if (isCurrentUser) {
-                StatCard(count = favoritesCount.toString(), label = "Favorite", icon = Icons.Default.Favorite, color = Color(0xFFFFEBEE), contentColor = Color(0xFFD32F2F))
+                StatCard(
+                    modifier = Modifier.weight(1f),
+                    count = favoritesCount.toString(), 
+                    label = "Favorites", 
+                    icon = Icons.Default.Favorite, 
+                    color = Color(0xFFFFEBEE), 
+                    contentColor = Color(0xFFD32F2F),
+                    onClick = { selectedTabIndex = 1 }
+                )
             }
-            StatCard(count = swapsCount.toString(), label = "Swaps", icon = Icons.Default.SwapHoriz, color = Color(0xFFE3F2FD), contentColor = Color(0xFF1976D2))
+            StatCard(
+                modifier = Modifier.weight(1f),
+                count = swapsCount.toString(), 
+                label = "Swaps", 
+                icon = Icons.Default.SwapHoriz, 
+                color = Color(0xFFE3F2FD), 
+                contentColor = Color(0xFF1976D2)
+            )
             if (isCurrentUser) {
-                StatCard(count = wishlistCount.toString(), label = "Wishlist", icon = Icons.Default.Bookmark, color = Color(0xFFF3E5F5), contentColor = Color(0xFF7B1FA2))
+                StatCard(
+                    modifier = Modifier.weight(1f),
+                    count = wishlistCount.toString(),
+                    label = "Wishlist", 
+                    icon = Icons.Default.Bookmark, 
+                    color = Color(0xFFF3E5F5), 
+                    contentColor = Color(0xFF7B1FA2),
+                    onClick = onWishlistClick
+                )
             }
         }
 
@@ -222,7 +318,9 @@ fun ProfileScreen(
                             Text(
                                 text = title,
                                 fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 14.sp
+                                fontSize = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     )
@@ -425,31 +523,48 @@ fun StatCard(
     label: String,
     icon: ImageVector,
     color: Color,
-    contentColor: Color
+    contentColor: Color,
+    onClick: () -> Unit = {}
 ) {
     Surface(
-        modifier = modifier.width(105.dp),
-        shape = RoundedCornerShape(20.dp),
+        modifier = modifier
+            .height(90.dp) // Fixed uniform height
+            .clickable { onClick() },
+        shape = RoundedCornerShape(18.dp),
         color = Color.White,
         shadowElevation = 2.dp
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
                     .background(color),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(20.dp))
+                Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(18.dp))
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = count, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-            Text(text = label, fontSize = 12.sp, color = Color.Gray)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = count, 
+                fontWeight = FontWeight.ExtraBold, 
+                fontSize = 16.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = label, 
+                fontSize = 10.sp, 
+                color = Color.Gray,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }

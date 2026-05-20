@@ -40,6 +40,10 @@ fun BookDetailsScreen(
     val loading by chatViewModel.loading
     val bookLoading by bookViewModel.loading
     val error by bookViewModel.error
+    
+    val wishlist = bookViewModel.wishlist
+    val isWishlisted = wishlist.contains(bookId)
+    
     val windowSize = rememberWindowSize()
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
@@ -222,9 +226,26 @@ fun BookDetailsScreen(
                     IconButton(onClick = onBack, modifier = Modifier.background(Color.Black.copy(alpha = 0.3f), CircleShape).size(40.dp)) {
                         Icon(Icons.Default.ChevronLeft, contentDescription = null, tint = Color.White)
                     }
-                    IconButton(onClick = { if (isOwner) showDeleteDialog = true }, modifier = Modifier.background(Color.Black.copy(alpha = 0.3f), CircleShape).size(40.dp)) {
-                        if (isOwner) Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
-                        else Icon(Icons.Outlined.BookmarkBorder, contentDescription = "Bookmark", tint = Color.White)
+                    
+                    IconButton(
+                        onClick = { 
+                            if (isOwner) {
+                                showDeleteDialog = true 
+                            } else {
+                                book.id?.let { bookViewModel.toggleWishlist(it) }
+                            }
+                        }, 
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.3f), CircleShape).size(40.dp)
+                    ) {
+                        if (isOwner) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
+                        } else {
+                            Icon(
+                                imageVector = if (isWishlisted) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, 
+                                contentDescription = "Wishlist", 
+                                tint = if (isWishlisted) CyanMain else Color.White
+                            )
+                        }
                     }
                 }
 

@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.bookswap.ui.theme.CyanMain
-import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -249,13 +248,6 @@ fun EditBookScreen(
             } else {
                 Button(
                     onClick = {
-                        var byteArray: ByteArray? = null
-                        if (imageBitmap != null) {
-                            val stream = ByteArrayOutputStream()
-                            imageBitmap!!.compress(Bitmap.CompressFormat.JPEG, 80, stream)
-                            byteArray = stream.toByteArray()
-                        }
-                        
                         book.id?.let { id ->
                             viewModel.updateBook(
                                 bookId = id,
@@ -267,7 +259,7 @@ fun EditBookScreen(
                                 isForRent = isForRent,
                                 isAvailable = isAvailable,
                                 rentalPrice = rentalPrice.toDoubleOrNull(),
-                                imageBytes = byteArray,
+                                imageBitmap = imageBitmap,
                                 existingImageUrl = book.imageUrl,
                                 onSuccess = onBookUpdated
                             )

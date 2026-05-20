@@ -16,9 +16,11 @@ import io.github.jan.supabase.realtime.decodeRecord
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.realtime.realtime
 import io.github.jan.supabase.storage.storage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 
@@ -39,6 +41,9 @@ class BookViewModel : ViewModel() {
 
     private val _favorites = mutableStateListOf<Long>()
     val favorites: List<Long> = _favorites
+
+    private val _wishlist = mutableStateListOf<Long>()
+    val wishlist: List<Long> = _wishlist
 
     init {
         fetchBooks()
@@ -95,6 +100,7 @@ class BookViewModel : ViewModel() {
                 _books.addAll(results)
                 
                 fetchFavorites()
+                fetchWishlist()
             } catch (e: Exception) {
                 _error.value = "Failed to fetch books: ${e.message}"
             } finally {
@@ -122,6 +128,25 @@ class BookViewModel : ViewModel() {
         }
     }
 
+    fun fetchWishlist() {
+        val user = auth.currentUserOrNull() ?: return
+        viewModelScope.launch {
+            try {
+                val results = postgrest["wishlist"]
+                    .select {
+                        filter {
+                            eq("user_id", user.id)
+                        }
+                    }
+                    .decodeList<WishlistItem>()
+                _wishlist.clear()
+                _wishlist.addAll(results.map { it.bookId })
+            } catch (e: Exception) {
+                println("Failed to fetch wishlist: ${e.message}")
+            }
+        }
+    }
+
     fun toggleFavorite(bookId: Long) {
         val user = auth.currentUserOrNull() ?: return
         
@@ -142,6 +167,30 @@ class BookViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 _error.value = "Failed to update favorite: ${e.message}"
+            }
+        }
+    }
+
+    fun toggleWishlist(bookId: Long) {
+        val user = auth.currentUserOrNull() ?: return
+        
+        viewModelScope.launch {
+            try {
+                if (_wishlist.contains(bookId)) {
+                    postgrest["wishlist"].delete {
+                        filter {
+                            eq("user_id", user.id)
+                            eq("book_id", bookId)
+                        }
+                    }
+                    _wishlist.remove(bookId)
+                } else {
+                    val item = WishlistItem(userId = user.id, bookId = bookId)
+                    postgrest["wishlist"].insert(item)
+                    _wishlist.add(bookId)
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to update wishlist: ${e.message}"
             }
         }
     }
@@ -211,6 +260,21 @@ class BookViewModel : ViewModel() {
         }
     }
 
+    private suspend fun compressImage(bitmap: Bitmap): ByteArray = withContext(Dispatchers.Default) {
+        var quality = 80
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+        var compressedBytes = outputStream.toByteArray()
+        
+        while (compressedBytes.size > 300 * 1024 && quality > 10) {
+            quality -= 10
+            val loopStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, loopStream)
+            compressedBytes = loopStream.toByteArray()
+        }
+        compressedBytes
+    }
+
     fun addBook(
         title: String,
         author: String,
@@ -219,7 +283,7 @@ class BookViewModel : ViewModel() {
         location: String,
         isForRent: Boolean,
         rentalPrice: Double?,
-        imageBytes: ByteArray?,
+        imageBitmap: Bitmap?,
         onSuccess: () -> Unit
     ) {
         if (title.isBlank() || description.isBlank()) {
@@ -234,39 +298,24 @@ class BookViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                var finalImageBytes = imageBytes
-                
-                if (finalImageBytes != null) {
-                    var quality = 80
-                    var bitmap = BitmapFactory.decodeByteArray(finalImageBytes, 0, finalImageBytes.size)
-                    
-                    val outputStream = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
-                    finalImageBytes = outputStream.toByteArray()
-                    
-                    while (finalImageBytes!!.size > 300 * 1024 && quality > 10) {
-                        quality -= 10
-                        val loopStream = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, loopStream)
-                        finalImageBytes = loopStream.toByteArray()
-                    }
-                }
-
                 var imageUrl: String? = null
-                if (finalImageBytes != null) {
+                if (imageBitmap != null) {
+                    val finalImageBytes = compressImage(imageBitmap)
                     val fileName = "${UUID.randomUUID()}.jpg"
                     val bucket = storage.from("book-images")
                     bucket.upload(fileName, finalImageBytes)
                     imageUrl = bucket.publicUrl(fileName)
                 }
 
-                val userName = currentUser.userMetadata?.get("full_name")?.toString()?.replace("\"", "") ?: "Unknown"
+                val fullName = currentUser.userMetadata?.get("full_name")?.toString()?.replace("\"", "") ?: "Unknown"
+                val username = currentUser.userMetadata?.get("username")?.toString()?.replace("\"", "") ?: fullName
                 
                 val book = Book(
                     title = title,
                     author = author,
                     description = description,
-                    owner = userName,
+                    owner = fullName,
+                    ownerUsername = username,
                     ownerId = currentUser.id,
                     rating = 0.0,
                     swaps = 0,
@@ -298,7 +347,7 @@ class BookViewModel : ViewModel() {
         isForRent: Boolean,
         isAvailable: Boolean,
         rentalPrice: Double?,
-        imageBytes: ByteArray?,
+        imageBitmap: Bitmap?,
         existingImageUrl: String?,
         onSuccess: () -> Unit
     ) {
@@ -329,21 +378,8 @@ class BookViewModel : ViewModel() {
             try {
                 var finalImageUrl = existingImageUrl
 
-                if (imageBytes != null) {
-                    var quality = 80
-                    var bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                    
-                    val outputStream = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
-                    var compressedBytes = outputStream.toByteArray()
-                    
-                    while (compressedBytes.size > 300 * 1024 && quality > 10) {
-                        quality -= 10
-                        val loopStream = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, loopStream)
-                        compressedBytes = loopStream.toByteArray()
-                    }
-                    
+                if (imageBitmap != null) {
+                    val compressedBytes = compressImage(imageBitmap)
                     val fileName = "${UUID.randomUUID()}.jpg"
                     val bucket = storage.from("book-images")
                     bucket.upload(fileName, compressedBytes)
